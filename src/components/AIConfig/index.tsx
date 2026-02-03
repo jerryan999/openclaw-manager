@@ -19,6 +19,7 @@ import {
   Zap,
   CheckCircle,
   XCircle,
+  Pencil,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { aiLogger } from '../../lib/logger';
@@ -89,27 +90,57 @@ interface AITestResult {
   latency_ms: number | null;
 }
 
-// ============ 添加 Provider 对话框 ============
+// ============ 添加/编辑 Provider 对话框 ============
 
-interface AddProviderDialogProps {
+interface ProviderDialogProps {
   officialProviders: OfficialProvider[];
   onClose: () => void;
   onSave: () => void;
+  // 编辑模式时传入现有配置
+  editingProvider?: ConfiguredProvider | null;
 }
 
-function AddProviderDialog({ officialProviders, onClose, onSave }: AddProviderDialogProps) {
-  const [step, setStep] = useState<'select' | 'configure'>('select');
-  const [selectedOfficial, setSelectedOfficial] = useState<OfficialProvider | null>(null);
+function ProviderDialog({ officialProviders, onClose, onSave, editingProvider }: ProviderDialogProps) {
+  const isEditing = !!editingProvider;
+  const [step, setStep] = useState<'select' | 'configure'>(isEditing ? 'configure' : 'select');
+  const [selectedOfficial, setSelectedOfficial] = useState<OfficialProvider | null>(() => {
+    if (editingProvider) {
+      return officialProviders.find(p => 
+        editingProvider.name.includes(p.id) || p.id === editingProvider.name
+      ) || null;
+    }
+    return null;
+  });
   
   // 配置表单
-  const [providerName, setProviderName] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
+  const [providerName, setProviderName] = useState(editingProvider?.name || '');
+  const [baseUrl, setBaseUrl] = useState(editingProvider?.base_url || '');
   const [apiKey, setApiKey] = useState('');
-  const [apiType, setApiType] = useState('openai-completions');
+  const [apiType, setApiType] = useState(() => {
+    if (editingProvider) {
+      const firstModel = editingProvider.models[0];
+      return firstModel?.api_type || 'openai-completions';
+    }
+    return 'openai-completions';
+  });
   const [showApiKey, setShowApiKey] = useState(false);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [selectedModels, setSelectedModels] = useState<string[]>(() => {
+    if (editingProvider) {
+      return editingProvider.models.map(m => m.id);
+    }
+    return [];
+  });
   const [customModelId, setCustomModelId] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // 检查是否是官方 Provider 名字但使用了自定义地址
+  const isCustomUrlWithOfficialName = (() => {
+    const official = officialProviders.find(p => p.id === providerName);
+    if (official && official.default_base_url && baseUrl !== official.default_base_url) {
+      return true;
+    }
+    return false;
+  })();
   
   const handleSelectOfficial = (provider: OfficialProvider) => {
     setSelectedOfficial(provider);
@@ -146,10 +177,37 @@ function AddProviderDialog({ officialProviders, onClose, onSave }: AddProviderDi
     }
   };
 
+  // 自动建议使用自定义名称
+  const suggestedName = (() => {
+    if (isCustomUrlWithOfficialName && selectedOfficial) {
+      return `${selectedOfficial.id}-custom`;
+    }
+    return null;
+  })();
+
+  const handleApplySuggestedName = () => {
+    if (suggestedName) {
+      setProviderName(suggestedName);
+    }
+  };
+
   const handleSave = async () => {
     if (!providerName || !baseUrl || selectedModels.length === 0) {
       alert('请填写完整的 Provider 信息和至少选择一个模型');
       return;
+    }
+
+    // 如果使用官方名字但自定义了地址，给出警告
+    if (isCustomUrlWithOfficialName) {
+      const confirmed = confirm(
+        `您使用的是官方 Provider 名称 "${providerName}"，但修改了 API 地址。\n\n` +
+        `这可能导致配置被 OpenClaw 内置设置覆盖。\n\n` +
+        `建议使用不同的名称，如 "${suggestedName}"。\n\n` +
+        `是否仍要使用当前名称保存？`
+      );
+      if (!confirmed) {
+        return;
+      }
     }
     
     setSaving(true);
@@ -157,13 +215,15 @@ function AddProviderDialog({ officialProviders, onClose, onSave }: AddProviderDi
       // 构建模型配置
       const models: ModelConfig[] = selectedModels.map(modelId => {
         const suggested = selectedOfficial?.suggested_models.find(m => m.id === modelId);
+        // 编辑模式下，保留原有模型的配置
+        const existingModel = editingProvider?.models.find(m => m.id === modelId);
         return {
           id: modelId,
-          name: suggested?.name || modelId,
+          name: suggested?.name || existingModel?.name || modelId,
           api: apiType,
           input: ['text', 'image'],
-          context_window: suggested?.context_window || 200000,
-          max_tokens: suggested?.max_tokens || 8192,
+          context_window: suggested?.context_window || existingModel?.context_window || 200000,
+          max_tokens: suggested?.max_tokens || existingModel?.max_tokens || 8192,
           reasoning: false,
           cost: null,
         };
@@ -177,7 +237,7 @@ function AddProviderDialog({ officialProviders, onClose, onSave }: AddProviderDi
         models,
       });
 
-      aiLogger.info(`✓ Provider ${providerName} 已保存`);
+      aiLogger.info(`✓ Provider ${providerName} 已${isEditing ? '更新' : '保存'}`);
       onSave();
       onClose();
     } catch (e) {
@@ -206,8 +266,10 @@ function AddProviderDialog({ officialProviders, onClose, onSave }: AddProviderDi
         {/* 头部 */}
         <div className="px-6 py-4 border-b border-dark-600 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Plus size={20} className="text-claw-400" />
-            {step === 'select' ? '添加 AI Provider' : `配置 ${selectedOfficial?.name || '自定义 Provider'}`}
+            {isEditing ? <Settings2 size={20} className="text-claw-400" /> : <Plus size={20} className="text-claw-400" />}
+            {isEditing 
+              ? `编辑 Provider: ${editingProvider?.name}` 
+              : (step === 'select' ? '添加 AI Provider' : `配置 ${selectedOfficial?.name || '自定义 Provider'}`)}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white">
             ✕
@@ -278,8 +340,31 @@ function AddProviderDialog({ officialProviders, onClose, onSave }: AddProviderDi
                     value={providerName}
                     onChange={e => setProviderName(e.target.value)}
                     placeholder="如: anthropic-custom, my-openai"
-                    className="input-base"
+                    className={clsx(
+                      'input-base',
+                      isCustomUrlWithOfficialName && 'border-yellow-500/50'
+                    )}
+                    disabled={isEditing}
                   />
+                  {isEditing && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Provider 名称不可修改，如需更改请删除后重新创建
+                    </p>
+                  )}
+                  {isCustomUrlWithOfficialName && !isEditing && (
+                    <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                      <p className="text-xs text-yellow-400">
+                        ⚠️ 您使用的是官方 Provider 名称，但修改了 API 地址。建议使用不同的名称以避免配置冲突。
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleApplySuggestedName}
+                        className="mt-1 text-xs text-yellow-300 hover:text-yellow-200 underline"
+                      >
+                        使用建议名称: {suggestedName}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* API 地址 */}
@@ -302,12 +387,24 @@ function AddProviderDialog({ officialProviders, onClose, onSave }: AddProviderDi
                       <span className="text-gray-600 text-xs ml-2">(可选)</span>
                     )}
                   </label>
+                  {/* 编辑模式下显示当前 API Key 状态 */}
+                  {isEditing && editingProvider?.has_api_key && (
+                    <div className="mb-2 flex items-center gap-2 text-sm">
+                      <span className="text-gray-500">当前:</span>
+                      <code className="px-2 py-0.5 bg-dark-600 rounded text-gray-400">
+                        {editingProvider.api_key_masked}
+                      </code>
+                      <span className="text-green-400 text-xs">✓ 已配置</span>
+                    </div>
+                  )}
                   <div className="relative">
                     <input
                       type={showApiKey ? 'text' : 'password'}
                       value={apiKey}
                       onChange={e => setApiKey(e.target.value)}
-                      placeholder="sk-..."
+                      placeholder={isEditing && editingProvider?.has_api_key 
+                        ? "留空保持原有 API Key 不变，或输入新的 Key" 
+                        : "sk-..."}
                       className="input-base pr-10"
                     />
                     <button
@@ -318,6 +415,11 @@ function AddProviderDialog({ officialProviders, onClose, onSave }: AddProviderDi
                       {showApiKey ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
+                  {isEditing && editingProvider?.has_api_key && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 如果不需要更改 API Key，请保持为空
+                    </p>
+                  )}
                 </div>
 
                 {/* API 类型 */}
@@ -439,7 +541,7 @@ function AddProviderDialog({ officialProviders, onClose, onSave }: AddProviderDi
 
         {/* 底部按钮 */}
         <div className="px-6 py-4 border-t border-dark-600 flex justify-between">
-          {step === 'configure' && (
+          {step === 'configure' && !isEditing && (
             <button
               onClick={() => setStep('select')}
               className="btn-secondary"
@@ -453,13 +555,13 @@ function AddProviderDialog({ officialProviders, onClose, onSave }: AddProviderDi
               取消
             </button>
             {step === 'configure' && (
-                    <button
+              <button
                 onClick={handleSave}
                 disabled={saving || !providerName || !baseUrl || selectedModels.length === 0}
                 className="btn-primary flex items-center gap-2"
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                保存
+                {isEditing ? '更新' : '保存'}
               </button>
             )}
           </div>
@@ -476,9 +578,10 @@ interface ProviderCardProps {
   officialProviders: OfficialProvider[];
   onSetPrimary: (modelId: string) => void;
   onRefresh: () => void;
+  onEdit: (provider: ConfiguredProvider) => void;
 }
 
-function ProviderCard({ provider, officialProviders, onSetPrimary, onRefresh }: ProviderCardProps) {
+function ProviderCard({ provider, officialProviders, onSetPrimary, onRefresh, onEdit }: ProviderCardProps) {
   const [expanded, setExpanded] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
@@ -486,6 +589,9 @@ function ProviderCard({ provider, officialProviders, onSetPrimary, onRefresh }: 
   const officialInfo = officialProviders.find(p => 
     provider.name.includes(p.id) || p.id === provider.name
   );
+
+  // 检查是否使用了自定义地址
+  const isCustomUrl = officialInfo && officialInfo.default_base_url && provider.base_url !== officialInfo.default_base_url;
 
   const handleDelete = async () => {
     if (!confirm(`确定要删除 Provider "${provider.name}" 吗？这将同时删除其下所有模型配置。`)) {
@@ -522,6 +628,11 @@ function ProviderCard({ provider, officialProviders, onSetPrimary, onRefresh }: 
             {provider.has_api_key && (
               <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">
                 已配置
+              </span>
+            )}
+            {isCustomUrl && (
+              <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded">
+                自定义地址
               </span>
             )}
           </div>
@@ -597,7 +708,17 @@ function ProviderCard({ provider, officialProviders, onSetPrimary, onRefresh }: 
               </div>
 
               {/* 操作按钮 */}
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-end gap-4 pt-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(provider);
+                  }}
+                  className="flex items-center gap-1 text-sm text-claw-400 hover:text-claw-300 transition-colors"
+                >
+                  <Pencil size={14} />
+                  编辑 Provider
+                </button>
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
@@ -622,9 +743,20 @@ export function AIConfig() {
   const [officialProviders, setOfficialProviders] = useState<OfficialProvider[]>([]);
   const [aiConfig, setAiConfig] = useState<AIConfigOverview | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<ConfiguredProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<AITestResult | null>(null);
+
+  const handleEditProvider = (provider: ConfiguredProvider) => {
+    setEditingProvider(provider);
+    setShowAddDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setShowAddDialog(false);
+    setEditingProvider(null);
+  };
 
   const runAITest = async () => {
     aiLogger.action('测试 AI 连接');
@@ -847,6 +979,7 @@ export function AIConfig() {
                   officialProviders={officialProviders}
                   onSetPrimary={handleSetPrimary}
                   onRefresh={loadData}
+                  onEdit={handleEditProvider}
                 />
               ))}
             </div>
@@ -896,13 +1029,14 @@ export function AIConfig() {
         </div>
       </div>
 
-      {/* 添加 Provider 对话框 */}
+      {/* 添加/编辑 Provider 对话框 */}
       <AnimatePresence>
         {showAddDialog && (
-          <AddProviderDialog
+          <ProviderDialog
             officialProviders={officialProviders}
-            onClose={() => setShowAddDialog(false)}
+            onClose={handleCloseDialog}
             onSave={loadData}
+            editingProvider={editingProvider}
           />
         )}
       </AnimatePresence>

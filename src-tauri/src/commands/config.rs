@@ -626,9 +626,30 @@ pub async fn save_provider(
         "models": models_json,
     });
 
+    // 处理 API Key：如果传入了新的非空 key，使用新的；否则保留原有的
     if let Some(key) = api_key {
         if !key.is_empty() {
+            // 使用新传入的 API Key
             provider_config["apiKey"] = json!(key);
+            info!("[保存 Provider] 使用新的 API Key");
+        } else {
+            // 空字符串表示不更改，尝试保留原有的 API Key
+            if let Some(existing_key) = config
+                .pointer(&format!("/models/providers/{}/apiKey", provider_name))
+                .and_then(|v| v.as_str())
+            {
+                provider_config["apiKey"] = json!(existing_key);
+                info!("[保存 Provider] 保留原有的 API Key");
+            }
+        }
+    } else {
+        // None 表示不更改，尝试保留原有的 API Key
+        if let Some(existing_key) = config
+            .pointer(&format!("/models/providers/{}/apiKey", provider_name))
+            .and_then(|v| v.as_str())
+        {
+            provider_config["apiKey"] = json!(existing_key);
+            info!("[保存 Provider] 保留原有的 API Key");
         }
     }
 

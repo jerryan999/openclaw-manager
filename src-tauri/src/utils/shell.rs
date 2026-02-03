@@ -12,10 +12,70 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-/// 执行 Shell 命令
+/// 获取扩展的 PATH 环境变量
+/// GUI 应用启动时可能没有继承用户 shell 的 PATH，需要手动添加常见路径
+pub fn get_extended_path() -> String {
+    let mut paths = Vec::new();
+    
+    // 添加常见的可执行文件路径
+    paths.push("/opt/homebrew/bin".to_string());  // Homebrew on Apple Silicon
+    paths.push("/usr/local/bin".to_string());      // Homebrew on Intel / 常规安装
+    paths.push("/usr/bin".to_string());
+    paths.push("/bin".to_string());
+    
+    if let Some(home) = dirs::home_dir() {
+        let home_str = home.display().to_string();
+        
+        // nvm 路径（尝试获取当前版本）
+        let nvm_default = format!("{}/.nvm/alias/default", home_str);
+        if let Ok(version) = std::fs::read_to_string(&nvm_default) {
+            let version = version.trim();
+            if !version.is_empty() {
+                paths.insert(0, format!("{}/.nvm/versions/node/v{}/bin", home_str, version));
+            }
+        }
+        // 也添加常见 nvm 版本路径
+        for version in ["v22.22.0", "v22.12.0", "v22.11.0", "v22.0.0", "v23.0.0"] {
+            let nvm_bin = format!("{}/.nvm/versions/node/{}/bin", home_str, version);
+            if std::path::Path::new(&nvm_bin).exists() {
+                paths.insert(0, nvm_bin);
+                break; // 只添加第一个存在的
+            }
+        }
+        
+        // fnm
+        paths.push(format!("{}/.fnm/aliases/default/bin", home_str));
+        
+        // volta
+        paths.push(format!("{}/.volta/bin", home_str));
+        
+        // asdf
+        paths.push(format!("{}/.asdf/shims", home_str));
+        
+        // mise
+        paths.push(format!("{}/.local/share/mise/shims", home_str));
+    }
+    
+    // 获取当前 PATH 并合并
+    let current_path = std::env::var("PATH").unwrap_or_default();
+    if !current_path.is_empty() {
+        paths.push(current_path);
+    }
+    
+    paths.join(":")
+}
+
+/// 执行 Shell 命令（带扩展 PATH）
 pub fn run_command(cmd: &str, args: &[&str]) -> io::Result<Output> {
     let mut command = Command::new(cmd);
     command.args(args);
+    
+    // 在非 Windows 系统上使用扩展的 PATH
+    #[cfg(not(windows))]
+    {
+        let extended_path = get_extended_path();
+        command.env("PATH", extended_path);
+    }
     
     #[cfg(windows)]
     command.creation_flags(CREATE_NO_WINDOW);
@@ -37,10 +97,17 @@ pub fn run_command_output(cmd: &str, args: &[&str]) -> Result<String, String> {
     }
 }
 
-/// 执行 Bash 命令
+/// 执行 Bash 命令（带扩展 PATH）
 pub fn run_bash(script: &str) -> io::Result<Output> {
     let mut command = Command::new("bash");
     command.arg("-c").arg(script);
+    
+    // 在非 Windows 系统上使用扩展的 PATH
+    #[cfg(not(windows))]
+    {
+        let extended_path = get_extended_path();
+        command.env("PATH", extended_path);
+    }
     
     #[cfg(windows)]
     command.creation_flags(CREATE_NO_WINDOW);
@@ -234,59 +301,6 @@ fn get_windows_openclaw_paths() -> Vec<String> {
     paths.push("C:\\Program Files\\nodejs\\openclaw.cmd".to_string());
     
     paths
-}
-
-/// 获取扩展的 PATH 环境变量
-/// GUI 应用启动时可能没有继承用户 shell 的 PATH，需要手动添加常见路径
-fn get_extended_path() -> String {
-    let mut paths = Vec::new();
-    
-    // 添加常见的可执行文件路径
-    paths.push("/opt/homebrew/bin".to_string());  // Homebrew on Apple Silicon
-    paths.push("/usr/local/bin".to_string());      // Homebrew on Intel / 常规安装
-    paths.push("/usr/bin".to_string());
-    paths.push("/bin".to_string());
-    
-    if let Some(home) = dirs::home_dir() {
-        let home_str = home.display().to_string();
-        
-        // nvm 路径（尝试获取当前版本）
-        let nvm_default = format!("{}/.nvm/alias/default", home_str);
-        if let Ok(version) = std::fs::read_to_string(&nvm_default) {
-            let version = version.trim();
-            if !version.is_empty() {
-                paths.insert(0, format!("{}/.nvm/versions/node/v{}/bin", home_str, version));
-            }
-        }
-        // 也添加常见 nvm 版本路径
-        for version in ["v22.22.0", "v22.12.0", "v22.11.0", "v22.0.0", "v23.0.0"] {
-            let nvm_bin = format!("{}/.nvm/versions/node/{}/bin", home_str, version);
-            if std::path::Path::new(&nvm_bin).exists() {
-                paths.insert(0, nvm_bin);
-                break; // 只添加第一个存在的
-            }
-        }
-        
-        // fnm
-        paths.push(format!("{}/.fnm/aliases/default/bin", home_str));
-        
-        // volta
-        paths.push(format!("{}/.volta/bin", home_str));
-        
-        // asdf
-        paths.push(format!("{}/.asdf/shims", home_str));
-        
-        // mise
-        paths.push(format!("{}/.local/share/mise/shims", home_str));
-    }
-    
-    // 获取当前 PATH 并合并
-    let current_path = std::env::var("PATH").unwrap_or_default();
-    if !current_path.is_empty() {
-        paths.push(current_path);
-    }
-    
-    paths.join(":")
 }
 
 /// 执行 openclaw 命令并获取输出
