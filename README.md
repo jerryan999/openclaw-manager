@@ -7,45 +7,64 @@
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![Rust](https://img.shields.io/badge/Rust-1.70+-red)
 
-## ✨ 功能特性
+## 📸 界面预览
 
-### 📊 仪表盘
-- 实时服务状态监控
-- 进程内存使用统计
-- 一键启动/停止/重启
+### 📊 仪表盘概览
+
+实时监控服务状态，一键管理 AI 助手服务。
+
+![仪表盘](pic/dashboard.png)
+
+- 服务状态实时监控（端口、进程 ID、内存、运行时间）
+- 快捷操作：启动 / 停止 / 重启 / 诊断
+- 实时日志查看，支持自动刷新
+
+---
 
 ### 🤖 AI 模型配置
-- 支持 14+ AI 提供商
-  - Anthropic Claude
-  - OpenAI GPT
-  - DeepSeek
-  - Moonshot
-  - Google Gemini
-  - OpenRouter
-  - Groq
-  - Mistral
-  - Ollama（本地）
-  - 更多...
-- 自定义 API 地址
-- 模型快速切换
 
-### 📱 消息渠道
-- Telegram Bot
-- Discord Bot
-- Slack
-- 飞书
-- 微信
-- iMessage
+灵活配置多个 AI 提供商，支持自定义 API 地址。
 
-### ⚡ 服务管理
-- 后台服务控制
-- 实时日志查看
-- 开机自启配置
+![AI 配置](pic/ai.png)
 
-### 🧪 测试诊断
-- 系统环境检查
-- AI 连接测试
-- 渠道连通性测试
+- 支持 14+ AI 提供商（Anthropic、OpenAI、DeepSeek、Moonshot、Gemini 等）
+- 自定义 API 端点，兼容 OpenAI 格式的第三方服务
+- 一键设置主模型，快速切换
+
+---
+
+### 📱 消息渠道配置
+
+连接多种即时通讯平台，打造全渠道 AI 助手。
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="pic/telegram.png" alt="Telegram 配置">
+      <p align="center"><b>Telegram Bot</b></p>
+    </td>
+    <td width="50%">
+      <img src="pic/feishu.png" alt="飞书配置">
+      <p align="center"><b>飞书机器人</b></p>
+    </td>
+  </tr>
+</table>
+
+- **Telegram** - Bot Token 配置、私聊/群组策略
+- **飞书** - App ID/Secret、WebSocket 连接、多部署区域
+- **更多渠道** - Discord、Slack、WhatsApp、iMessage、微信、钉钉
+
+---
+
+## ✨ 功能特性
+
+| 模块 | 功能 |
+|------|------|
+| 📊 **仪表盘** | 实时服务状态监控、进程内存统计、一键启动/停止/重启 |
+| 🤖 **AI 配置** | 14+ AI 提供商、自定义 API 地址、模型快速切换 |
+| 📱 **消息渠道** | Telegram、Discord、Slack、飞书、微信、iMessage、钉钉 |
+| ⚡ **服务管理** | 后台服务控制、实时日志、开机自启 |
+| 🧪 **测试诊断** | 系统环境检查、AI 连接测试、渠道连通性测试 |
 
 ## 🚀 快速开始
 
@@ -81,8 +100,8 @@ sudo dnf install webkit2gtk4.1-devel openssl-devel curl wget file libxdo-devel
 
 ```bash
 # 克隆项目
-git clone https://github.com/miaoxworld/OpenClawInstaller.git
-cd OpenClawInstaller/openclaw-manager
+git clone https://github.com/miaoxworld/openclaw-manager.git
+cd openclaw-manager
 
 # 安装依赖
 npm install
@@ -207,7 +226,8 @@ MIT License - 详见 [LICENSE](LICENSE)
 
 ## 🔗 相关链接
 
-- [OpenClaw 主项目](https://github.com/miaoxworld/OpenClawInstaller)
+- [OpenClaw Manager](https://github.com/miaoxworld/openclaw-manager) - 图形界面版本（本项目）
+- [OpenClawInstaller](https://github.com/miaoxworld/OpenClawInstaller) - 命令行版本
 - [Tauri 官方文档](https://tauri.app/)
 - [React 官方文档](https://react.dev/)
 

@@ -13,6 +13,7 @@ const pageTitles: Record<PageType, { title: string; description: string }> = {
   ai: { title: 'AI 模型配置', description: '配置 AI 提供商和模型' },
   channels: { title: '消息渠道', description: '配置 Telegram、Discord、飞书等' },
   testing: { title: '测试诊断', description: '系统诊断与问题排查' },
+  logs: { title: '应用日志', description: '查看 Manager 应用的控制台日志' },
   settings: { title: '设置', description: '身份配置与高级选项' },
 };
 

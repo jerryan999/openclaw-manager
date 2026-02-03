@@ -5,6 +5,16 @@
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
+// 日志条目
+export interface LogEntry {
+  id: number;
+  timestamp: Date;
+  level: LogLevel;
+  module: string;
+  message: string;
+  args: unknown[];
+}
+
 // 日志级别权重
 const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 0,
@@ -12,6 +22,47 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   warn: 2,
   error: 3,
 };
+
+// 日志存储
+class LogStore {
+  private logs: LogEntry[] = [];
+  private maxLogs = 500;
+  private idCounter = 0;
+  private listeners: Set<() => void> = new Set();
+
+  add(entry: Omit<LogEntry, 'id'>) {
+    const newEntry: LogEntry = {
+      ...entry,
+      id: ++this.idCounter,
+    };
+    this.logs.push(newEntry);
+    
+    // 限制日志数量
+    if (this.logs.length > this.maxLogs) {
+      this.logs = this.logs.slice(-this.maxLogs);
+    }
+    
+    // 通知监听者
+    this.listeners.forEach(listener => listener());
+  }
+
+  getAll(): LogEntry[] {
+    return [...this.logs];
+  }
+
+  clear() {
+    this.logs = [];
+    this.listeners.forEach(listener => listener());
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+}
+
+// 全局日志存储实例
+export const logStore = new LogStore();
 
 // 当前日志级别（可通过 localStorage 设置）
 const getCurrentLevel = (): LogLevel => {
@@ -85,6 +136,15 @@ class Logger {
       STYLES[level],
       ...args
     );
+
+    // 存储日志
+    logStore.add({
+      timestamp: now,
+      level,
+      module: this.module,
+      message,
+      args,
+    });
   }
 
   debug(message: string, ...args: unknown[]): void {
@@ -154,6 +214,7 @@ export const apiLogger = createLogger('API');
 // 在控制台暴露日志控制函数
 if (typeof window !== 'undefined') {
   (window as unknown as Record<string, unknown>).setLogLevel = setLogLevel;
+  (window as unknown as Record<string, unknown>).logStore = logStore;
   console.log(
     '%c🦞 OpenClaw Manager 日志已启用\n' +
     '%c使用 setLogLevel("debug"|"info"|"warn"|"error") 设置日志级别',

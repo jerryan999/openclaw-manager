@@ -8,11 +8,12 @@ import { AIConfig } from './components/AIConfig';
 import { Channels } from './components/Channels';
 import { Settings } from './components/Settings';
 import { Testing } from './components/Testing';
+import { Logs } from './components/Logs';
 import { Setup } from './components/Setup';
 import { appLogger } from './lib/logger';
 import { isTauri } from './lib/tauri';
 
-export type PageType = 'dashboard' | 'ai' | 'channels' | 'testing' | 'settings';
+export type PageType = 'dashboard' | 'ai' | 'channels' | 'testing' | 'logs' | 'settings';
 
 interface EnvironmentStatus {
   node_installed: boolean;
@@ -107,6 +108,7 @@ function App() {
       ai: <AIConfig />,
       channels: <Channels />,
       testing: <Testing />,
+      logs: <Logs />,
       settings: <Settings />,
     };
 

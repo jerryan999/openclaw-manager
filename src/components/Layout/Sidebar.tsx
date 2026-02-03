@@ -3,8 +3,8 @@ import {
   LayoutDashboard,
   Bot,
   MessageSquare,
-  Zap,
   FlaskConical,
+  ScrollText,
   Settings,
 } from 'lucide-react';
 import { PageType } from '../../App';
@@ -27,6 +27,7 @@ const menuItems: { id: PageType; label: string; icon: React.ElementType }[] = [
   { id: 'ai', label: 'AI 配置', icon: Bot },
   { id: 'channels', label: '消息渠道', icon: MessageSquare },
   { id: 'testing', label: '测试诊断', icon: FlaskConical },
+  { id: 'logs', label: '应用日志', icon: ScrollText },
   { id: 'settings', label: '设置', icon: Settings },
 ];
 
