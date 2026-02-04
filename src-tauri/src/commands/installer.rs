@@ -879,3 +879,203 @@ fi
         }),
     }
 }
+
+/// 版本更新信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateInfo {
+    /// 是否有更新可用
+    pub update_available: bool,
+    /// 当前版本
+    pub current_version: Option<String>,
+    /// 最新版本
+    pub latest_version: Option<String>,
+    /// 错误信息
+    pub error: Option<String>,
+}
+
+/// 检查 OpenClaw 更新
+#[command]
+pub async fn check_openclaw_update() -> Result<UpdateInfo, String> {
+    info!("[版本检查] 开始检查 OpenClaw 更新...");
+    
+    // 获取当前版本
+    let current_version = get_openclaw_version();
+    info!("[版本检查] 当前版本: {:?}", current_version);
+    
+    if current_version.is_none() {
+        info!("[版本检查] OpenClaw 未安装");
+        return Ok(UpdateInfo {
+            update_available: false,
+            current_version: None,
+            latest_version: None,
+            error: Some("OpenClaw 未安装".to_string()),
+        });
+    }
+    
+    // 获取最新版本
+    let latest_version = get_latest_openclaw_version();
+    info!("[版本检查] 最新版本: {:?}", latest_version);
+    
+    if latest_version.is_none() {
+        return Ok(UpdateInfo {
+            update_available: false,
+            current_version,
+            latest_version: None,
+            error: Some("无法获取最新版本信息".to_string()),
+        });
+    }
+    
+    // 比较版本
+    let current = current_version.clone().unwrap();
+    let latest = latest_version.clone().unwrap();
+    let update_available = compare_versions(&current, &latest);
+    
+    info!("[版本检查] 是否有更新: {}", update_available);
+    
+    Ok(UpdateInfo {
+        update_available,
+        current_version,
+        latest_version,
+        error: None,
+    })
+}
+
+/// 获取 npm registry 上的最新版本
+fn get_latest_openclaw_version() -> Option<String> {
+    // 使用 npm view 获取最新版本
+    let result = if platform::is_windows() {
+        shell::run_cmd_output("npm view openclaw version")
+    } else {
+        shell::run_bash_output("npm view openclaw version 2>/dev/null")
+    };
+    
+    match result {
+        Ok(version) => {
+            let v = version.trim().to_string();
+            if v.is_empty() {
+                None
+            } else {
+                Some(v)
+            }
+        }
+        Err(e) => {
+            warn!("[版本检查] 获取最新版本失败: {}", e);
+            None
+        }
+    }
+}
+
+/// 比较版本号，返回是否有更新可用
+/// current: 当前版本 (如 "1.0.0" 或 "v1.0.0")
+/// latest: 最新版本 (如 "1.0.1")
+fn compare_versions(current: &str, latest: &str) -> bool {
+    // 移除可能的 'v' 前缀和空白
+    let current = current.trim().trim_start_matches('v');
+    let latest = latest.trim().trim_start_matches('v');
+    
+    // 分割版本号
+    let current_parts: Vec<u32> = current
+        .split('.')
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    let latest_parts: Vec<u32> = latest
+        .split('.')
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    
+    // 比较每个部分
+    for i in 0..3 {
+        let c = current_parts.get(i).unwrap_or(&0);
+        let l = latest_parts.get(i).unwrap_or(&0);
+        if l > c {
+            return true;
+        } else if l < c {
+            return false;
+        }
+    }
+    
+    false
+}
+
+/// 更新 OpenClaw
+#[command]
+pub async fn update_openclaw() -> Result<InstallResult, String> {
+    info!("[更新OpenClaw] 开始更新 OpenClaw...");
+    let os = platform::get_os();
+    
+    // 先停止服务
+    info!("[更新OpenClaw] 尝试停止服务...");
+    let _ = shell::run_openclaw(&["gateway", "stop"]);
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    
+    let result = match os.as_str() {
+        "windows" => {
+            info!("[更新OpenClaw] 使用 Windows 更新方式...");
+            update_openclaw_windows().await
+        },
+        _ => {
+            info!("[更新OpenClaw] 使用 Unix 更新方式 (npm)...");
+            update_openclaw_unix().await
+        },
+    };
+    
+    match &result {
+        Ok(r) if r.success => info!("[更新OpenClaw] ✓ 更新成功"),
+        Ok(r) => warn!("[更新OpenClaw] ✗ 更新失败: {}", r.message),
+        Err(e) => error!("[更新OpenClaw] ✗ 更新错误: {}", e),
+    }
+    
+    result
+}
+
+/// Windows 更新 OpenClaw
+async fn update_openclaw_windows() -> Result<InstallResult, String> {
+    info!("[更新OpenClaw] 执行 npm install -g openclaw@latest...");
+    
+    match shell::run_cmd_output("npm install -g openclaw@latest") {
+        Ok(output) => {
+            info!("[更新OpenClaw] npm 输出: {}", output);
+            
+            // 获取新版本
+            let new_version = get_openclaw_version();
+            
+            Ok(InstallResult {
+                success: true,
+                message: format!("OpenClaw 已更新到 {}", new_version.unwrap_or("最新版本".to_string())),
+                error: None,
+            })
+        }
+        Err(e) => {
+            warn!("[更新OpenClaw] npm install 失败: {}", e);
+            Ok(InstallResult {
+                success: false,
+                message: "OpenClaw 更新失败".to_string(),
+                error: Some(e),
+            })
+        }
+    }
+}
+
+/// Unix 系统更新 OpenClaw
+async fn update_openclaw_unix() -> Result<InstallResult, String> {
+    let script = r#"
+echo "更新 OpenClaw..."
+npm install -g openclaw@latest
+
+# 验证更新
+openclaw --version
+"#;
+    
+    match shell::run_bash_output(script) {
+        Ok(output) => Ok(InstallResult {
+            success: true,
+            message: format!("OpenClaw 已更新！{}", output),
+            error: None,
+        }),
+        Err(e) => Ok(InstallResult {
+            success: false,
+            message: "OpenClaw 更新失败".to_string(),
+            error: Some(e),
+        }),
+    }
+}
