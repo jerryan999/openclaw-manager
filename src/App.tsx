@@ -104,7 +104,7 @@ function App() {
       channels: <Channels />,
       testing: <Testing />,
       logs: <Logs />,
-      settings: <Settings />,
+      settings: <Settings onEnvironmentChange={checkEnvironment} />,
     };
 
     return (

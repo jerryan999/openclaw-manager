@@ -69,6 +69,7 @@ fn main() {
             installer::install_openclaw,
             installer::init_openclaw_config,
             installer::open_install_terminal,
+            installer::uninstall_openclaw,
         ])
         .run(tauri::generate_context!())
         .expect("运行 Tauri 应用时发生错误");

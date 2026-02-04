@@ -781,3 +781,101 @@ read -p "按回车键关闭..."
         Err("无法启动终端，请手动运行: npm install -g openclaw".to_string())
     }
 }
+
+/// 卸载 OpenClaw
+#[command]
+pub async fn uninstall_openclaw() -> Result<InstallResult, String> {
+    info!("[卸载OpenClaw] 开始卸载 OpenClaw...");
+    let os = platform::get_os();
+    info!("[卸载OpenClaw] 检测到操作系统: {}", os);
+    
+    // 先停止服务
+    info!("[卸载OpenClaw] 尝试停止服务...");
+    let _ = shell::run_openclaw(&["gateway", "stop"]);
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    
+    let result = match os.as_str() {
+        "windows" => {
+            info!("[卸载OpenClaw] 使用 Windows 卸载方式...");
+            uninstall_openclaw_windows().await
+        },
+        _ => {
+            info!("[卸载OpenClaw] 使用 Unix 卸载方式 (npm)...");
+            uninstall_openclaw_unix().await
+        },
+    };
+    
+    match &result {
+        Ok(r) if r.success => info!("[卸载OpenClaw] ✓ 卸载成功"),
+        Ok(r) => warn!("[卸载OpenClaw] ✗ 卸载失败: {}", r.message),
+        Err(e) => error!("[卸载OpenClaw] ✗ 卸载错误: {}", e),
+    }
+    
+    result
+}
+
+/// Windows 卸载 OpenClaw
+async fn uninstall_openclaw_windows() -> Result<InstallResult, String> {
+    // 使用 cmd.exe 执行 npm uninstall，避免 PowerShell 执行策略问题
+    info!("[卸载OpenClaw] 执行 npm uninstall -g openclaw...");
+    
+    match shell::run_cmd_output("npm uninstall -g openclaw") {
+        Ok(output) => {
+            info!("[卸载OpenClaw] npm 输出: {}", output);
+            
+            // 验证卸载是否成功
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            if get_openclaw_version().is_none() {
+                Ok(InstallResult {
+                    success: true,
+                    message: "OpenClaw 已成功卸载！".to_string(),
+                    error: None,
+                })
+            } else {
+                Ok(InstallResult {
+                    success: false,
+                    message: "卸载命令已执行，但 OpenClaw 仍然存在，请尝试手动卸载".to_string(),
+                    error: Some(output),
+                })
+            }
+        }
+        Err(e) => {
+            warn!("[卸载OpenClaw] npm uninstall 失败: {}", e);
+            Ok(InstallResult {
+                success: false,
+                message: "OpenClaw 卸载失败".to_string(),
+                error: Some(e),
+            })
+        }
+    }
+}
+
+/// Unix 系统卸载 OpenClaw
+async fn uninstall_openclaw_unix() -> Result<InstallResult, String> {
+    let script = r#"
+echo "卸载 OpenClaw..."
+npm uninstall -g openclaw
+
+# 验证卸载
+if command -v openclaw &> /dev/null; then
+    echo "警告：openclaw 命令仍然存在"
+    exit 1
+else
+    echo "OpenClaw 已成功卸载"
+    exit 0
+fi
+"#;
+    
+    match shell::run_bash_output(script) {
+        Ok(output) => Ok(InstallResult {
+            success: true,
+            message: format!("OpenClaw 已成功卸载！{}", output),
+            error: None,
+        }),
+        Err(e) => Ok(InstallResult {
+            success: false,
+            message: "OpenClaw 卸载失败".to_string(),
+            error: Some(e),
+        }),
+    }
+}
