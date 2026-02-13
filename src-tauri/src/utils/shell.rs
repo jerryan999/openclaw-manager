@@ -355,7 +355,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
     
     let openclaw_path = get_openclaw_path().ok_or_else(|| {
         warn!("[Shell] 找不到 openclaw 命令");
-        "找不到 openclaw 命令，请确保已通过 npm install -g openclaw 安装".to_string()
+        "找不到 openclaw 命令，请确保已通过 npm install -g @qingchencloud/openclaw-zh 安装".to_string()
     })?;
     
     debug!("[Shell] openclaw 路径: {}", openclaw_path);
@@ -450,7 +450,7 @@ pub fn spawn_openclaw_gateway() -> io::Result<()> {
         warn!("[Shell] 找不到 openclaw 命令");
         io::Error::new(
             io::ErrorKind::NotFound,
-            "找不到 openclaw 命令，请确保已通过 npm install -g openclaw 安装"
+            "找不到 openclaw 命令，请确保已通过 npm install -g @qingchencloud/openclaw-zh 安装"
         )
     })?;
     

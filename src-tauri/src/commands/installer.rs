@@ -517,8 +517,8 @@ if (-not $nodeVersion) {
     exit 1
 }
 
-Write-Host "使用 npm 安装 OpenClaw..."
-npm install -g openclaw@latest --unsafe-perm
+Write-Host "使用 npm 安装 OpenClaw 中文版..."
+npm install -g @qingchencloud/openclaw-zh@latest --unsafe-perm
 
 # 验证安装
 $openclawVersion = openclaw --version 2>$null
@@ -564,8 +564,8 @@ if ! command -v node &> /dev/null; then
     exit 1
 fi
 
-echo "使用 npm 安装 OpenClaw..."
-npm install -g openclaw@latest --unsafe-perm
+echo "使用 npm 安装 OpenClaw 中文版..."
+npm install -g @qingchencloud/openclaw-zh@latest --unsafe-perm
 
 # 验证安装
 openclaw --version
@@ -764,8 +764,8 @@ Write-Host "    OpenClaw 安装向导" -ForegroundColor White
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-Write-Host "正在安装 OpenClaw..." -ForegroundColor Yellow
-npm install -g openclaw@latest
+Write-Host "正在安装 OpenClaw 中文版..." -ForegroundColor Yellow
+npm install -g @qingchencloud/openclaw-zh@latest
 
 Write-Host ""
 Write-Host "初始化配置..."
@@ -788,8 +788,8 @@ echo "    OpenClaw 安装向导"
 echo "========================================"
 echo ""
 
-echo "正在安装 OpenClaw..."
-npm install -g openclaw@latest
+echo "正在安装 OpenClaw 中文版..."
+npm install -g @qingchencloud/openclaw-zh@latest
 
 echo ""
 echo "初始化配置..."
@@ -830,8 +830,8 @@ echo "    OpenClaw 安装向导"
 echo "========================================"
 echo ""
 
-echo "正在安装 OpenClaw..."
-npm install -g openclaw@latest
+echo "正在安装 OpenClaw 中文版..."
+npm install -g @qingchencloud/openclaw-zh@latest
 
 echo ""
 echo "初始化配置..."
@@ -869,7 +869,7 @@ read -p "按回车键关闭..."
             }
         }
         
-        Err("无法启动终端，请手动运行: npm install -g openclaw".to_string())
+        Err("无法启动终端，请手动运行: npm install -g @qingchencloud/openclaw-zh".to_string())
     }
 }
 
@@ -908,9 +908,9 @@ pub async fn uninstall_openclaw() -> Result<InstallResult, String> {
 /// Windows 卸载 OpenClaw
 async fn uninstall_openclaw_windows() -> Result<InstallResult, String> {
     // 使用 cmd.exe 执行 npm uninstall，避免 PowerShell 执行策略问题
-    info!("[卸载OpenClaw] 执行 npm uninstall -g openclaw...");
+    info!("[卸载OpenClaw] 执行 npm uninstall -g @qingchencloud/openclaw-zh...");
     
-    match shell::run_cmd_output("npm uninstall -g openclaw") {
+    match shell::run_cmd_output("npm uninstall -g @qingchencloud/openclaw-zh") {
         Ok(output) => {
             info!("[卸载OpenClaw] npm 输出: {}", output);
             
@@ -945,7 +945,7 @@ async fn uninstall_openclaw_windows() -> Result<InstallResult, String> {
 async fn uninstall_openclaw_unix() -> Result<InstallResult, String> {
     let script = r#"
 echo "卸载 OpenClaw..."
-npm uninstall -g openclaw
+npm uninstall -g @qingchencloud/openclaw-zh
 
 # 验证卸载
 if command -v openclaw &> /dev/null; then
@@ -1035,9 +1035,9 @@ pub async fn check_openclaw_update() -> Result<UpdateInfo, String> {
 fn get_latest_openclaw_version() -> Option<String> {
     // 使用 npm view 获取最新版本
     let result = if platform::is_windows() {
-        shell::run_cmd_output("npm view openclaw version")
+        shell::run_cmd_output("npm view @qingchencloud/openclaw-zh version")
     } else {
-        shell::run_bash_output("npm view openclaw version 2>/dev/null")
+        shell::run_bash_output("npm view @qingchencloud/openclaw-zh version 2>/dev/null")
     };
     
     match result {
@@ -1121,9 +1121,9 @@ pub async fn update_openclaw() -> Result<InstallResult, String> {
 
 /// Windows 更新 OpenClaw
 async fn update_openclaw_windows() -> Result<InstallResult, String> {
-    info!("[更新OpenClaw] 执行 npm install -g openclaw@latest...");
+    info!("[更新OpenClaw] 执行 npm install -g @qingchencloud/openclaw-zh@latest...");
     
-    match shell::run_cmd_output("npm install -g openclaw@latest") {
+    match shell::run_cmd_output("npm install -g @qingchencloud/openclaw-zh@latest") {
         Ok(output) => {
             info!("[更新OpenClaw] npm 输出: {}", output);
             
@@ -1151,7 +1151,7 @@ async fn update_openclaw_windows() -> Result<InstallResult, String> {
 async fn update_openclaw_unix() -> Result<InstallResult, String> {
     let script = r#"
 echo "更新 OpenClaw..."
-npm install -g openclaw@latest
+npm install -g @qingchencloud/openclaw-zh@latest
 
 # 验证更新
 openclaw --version
