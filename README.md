@@ -2,6 +2,8 @@
 
 高性能跨平台 AI 助手管理工具，基于 **Tauri 2.0 + React + TypeScript + Rust** 构建。
 
+> **✨ 本项目使用 [jerryan999/OpenClawChinese](https://github.com/jerryan999/OpenClawChinese) 无广告中文版。**
+
 ![Platform](https://img.shields.io/badge/platform-macOS%20|%20Windows%20|%20Linux-blue)
 ![Tauri](https://img.shields.io/badge/Tauri-2.0-orange)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
@@ -296,6 +298,7 @@ MIT License - 详见 [LICENSE](LICENSE)
 
 - [OpenClaw Manager](https://github.com/miaoxworld/openclaw-manager) - 图形界面版本（本项目）
 - [OpenClawInstaller](https://github.com/miaoxworld/OpenClawInstaller) - 命令行版本
+- [OpenClaw 中文版](https://github.com/jerryan999/OpenClawChinese) - 本项目使用的 OpenClaw 中文版
 - [OpenClaw 插件文档](https://docs.clawd.bot/plugins) - 官方插件文档
 - [Tauri 官方文档](https://tauri.app/)
 - [React 官方文档](https://react.dev/)

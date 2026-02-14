@@ -193,14 +193,6 @@ pub async fn get_recommended_providers() -> Result<Vec<OfficialProvider>, String
             docs_url: None,
             suggested_models: vec![
                 SuggestedModel {
-                    id: "grok-4-fast".to_string(),
-                    name: "Grok 4 Fast".to_string(),
-                    description: Some("xAI 高速版；响应快、性价比高".to_string()),
-                    context_window: Some(128000),
-                    max_tokens: Some(8192),
-                    recommended: true,
-                },
-                SuggestedModel {
                     id: "gpt-5-mini".to_string(),
                     name: "GPT-5 Mini".to_string(),
                     description: Some("更快更省；适合日常对话与轻量任务".to_string()),
@@ -213,6 +205,14 @@ pub async fn get_recommended_providers() -> Result<Vec<OfficialProvider>, String
                     name: "Claude Haiku 4.5".to_string(),
                     description: Some("轻量低价；响应快".to_string()),
                     context_window: Some(200000),
+                    max_tokens: Some(8192),
+                    recommended: true,
+                },
+                SuggestedModel {
+                    id: "glm-5".to_string(),
+                    name: "GLM-5".to_string(),
+                    description: Some("开源模型最强".to_string()),
+                    context_window: Some(202752),
                     max_tokens: Some(8192),
                     recommended: false,
                 },
@@ -481,12 +481,20 @@ pub async fn get_official_providers() -> Result<Vec<OfficialProvider>, String> {
             docs_url: Some("https://docs.openclaw.ai/providers/glm".to_string()),
             suggested_models: vec![
                 SuggestedModel {
+                    id: "glm-5".to_string(),
+                    name: "GLM-5".to_string(),
+                    description: Some("开源模型最强".to_string()),
+                    context_window: Some(202752),
+                    max_tokens: Some(8192),
+                    recommended: true,
+                },
+                SuggestedModel {
                     id: "glm-4".to_string(),
                     name: "GLM-4".to_string(),
                     description: Some("最新旗舰模型".to_string()),
                     context_window: Some(128000),
                     max_tokens: Some(8192),
-                    recommended: true,
+                    recommended: false,
                 },
             ],
         },

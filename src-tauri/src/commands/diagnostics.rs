@@ -102,7 +102,7 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
         suggestion: if openclaw_installed {
             None
         } else {
-            Some("运行: npm install -g @qingchencloud/openclaw-zh".to_string())
+            Some("运行: npm install -g @jerryan999/openclaw-zh".to_string())
         },
     });
     
@@ -171,41 +171,42 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
     Ok(results)
 }
 
-/// 测试 AI 连接
+/// 测试 AI 连接（使用 openclaw agent，在临时工作区中执行以避免 Missing workspace template）
 #[command]
 pub async fn test_ai_connection() -> Result<AITestResult, String> {
     info!("[AI测试] 开始测试 AI 连接...");
-    
-    // 获取当前配置的 provider
+
+    let workspace = shell::create_agent_test_workspace()
+        .map_err(|e| format!("创建测试工作区失败: {}", e))?;
+
     let start = std::time::Instant::now();
-    
-    // 使用 openclaw 命令测试连接
     info!("[AI测试] 执行: openclaw agent --local --to +1234567890 --message 回复 OK");
-    let result = shell::run_openclaw(&["agent", "--local", "--to", "+1234567890", "--message", "回复 OK"]);
-    
+    let result = shell::run_openclaw_with_cwd(
+        &["agent", "--local", "--to", "+1234567890", "--message", "回复 OK"],
+        &workspace,
+    );
     let latency = start.elapsed().as_millis() as u64;
     info!("[AI测试] 命令执行完成, 耗时: {}ms", latency);
-    
+
+    // 尝试删除临时工作区（忽略失败）
+    let _ = std::fs::remove_dir_all(&workspace);
+
     match result {
         Ok(output) => {
             debug!("[AI测试] 原始输出: {}", output);
-            // 过滤掉警告信息
             let filtered: String = output
                 .lines()
                 .filter(|l: &&str| !l.contains("ExperimentalWarning"))
                 .collect::<Vec<&str>>()
                 .join("\n");
-            
             let success = !filtered.to_lowercase().contains("error")
                 && !filtered.contains("401")
                 && !filtered.contains("403");
-            
             if success {
                 info!("[AI测试] ✓ AI 连接测试成功");
             } else {
                 warn!("[AI测试] ✗ AI 连接测试失败: {}", filtered);
             }
-            
             Ok(AITestResult {
                 success,
                 provider: "current".to_string(),

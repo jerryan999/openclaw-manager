@@ -1,6 +1,8 @@
 use std::process::{Command, Output};
 use std::io;
+use std::path::{Path, PathBuf};
 use std::collections::HashMap;
+use std::fs;
 use crate::utils::platform;
 use crate::utils::file;
 use log::{info, debug, warn};
@@ -349,13 +351,95 @@ fn get_windows_openclaw_paths() -> Vec<String> {
     paths
 }
 
+/// openclaw agent 可能要求的工作区模板（若再报 Missing workspace template: XXX.md，在此追加 "XXX.md"）
+const AGENT_TEST_TEMPLATES: &[&str] = &[
+    "AGENTS.md",
+    "SOUL.md",
+    "TOOLS.md",
+    "IDENTITY.md",
+    "USER.md",
+    "HEARTBEAT.md",
+    "BOOTSTRAP.md",
+];
+
+/// 创建用于 agent 测试的临时工作区（包含 docs/reference/templates 下所需模板），
+/// 避免在 Manager 项目目录下执行 agent 时报 Missing workspace template。
+pub fn create_agent_test_workspace() -> Result<PathBuf, String> {
+    let name = format!(
+        "openclaw-manager-agent-test-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    );
+    let root = std::env::temp_dir().join(name);
+    let templates_dir = root.join("docs").join("reference").join("templates");
+    fs::create_dir_all(&templates_dir).map_err(|e| format!("创建临时工作区失败: {}", e))?;
+
+    let placeholder = b"# Placeholder\nMinimal template for OpenClaw Manager AI connection test.\n";
+    for name in AGENT_TEST_TEMPLATES {
+        fs::write(templates_dir.join(name), placeholder)
+            .map_err(|e| format!("写入 {} 失败: {}", name, e))?;
+    }
+
+    debug!("[Shell] 临时 agent 工作区: {} (templates: {:?})", root.display(), AGENT_TEST_TEMPLATES);
+    Ok(root)
+}
+
+/// 在指定工作目录下执行 openclaw 命令（用于 agent 测试，避免 Missing workspace template）
+pub fn run_openclaw_with_cwd(args: &[&str], cwd: &Path) -> Result<String, String> {
+    debug!("[Shell] 执行 openclaw 命令 (cwd={}): {:?}", cwd.display(), args);
+
+    let openclaw_path = get_openclaw_path().ok_or_else(|| {
+        warn!("[Shell] 找不到 openclaw 命令");
+        "找不到 openclaw 命令，请确保已通过 npm install -g @jerryan999/openclaw-zh 安装".to_string()
+    })?;
+
+    let extended_path = get_extended_path();
+
+    let output = if openclaw_path.ends_with(".cmd") {
+        let mut cmd_args = vec!["/c", &openclaw_path];
+        cmd_args.extend(args);
+        let mut cmd = Command::new("cmd");
+        cmd.args(&cmd_args)
+            .current_dir(cwd)
+            .env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN)
+            .env("PATH", &extended_path);
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.output()
+    } else {
+        let mut cmd = Command::new(&openclaw_path);
+        cmd.args(args)
+            .current_dir(cwd)
+            .env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN)
+            .env("PATH", &extended_path);
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.output()
+    };
+
+    match output {
+        Ok(out) => {
+            let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+            if out.status.success() {
+                Ok(stdout)
+            } else {
+                Err(format!("{}\n{}", stdout, stderr).trim().to_string())
+            }
+        }
+        Err(e) => Err(format!("执行 openclaw 失败: {}", e)),
+    }
+}
+
 /// 执行 openclaw 命令并获取输出
 pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
     debug!("[Shell] 执行 openclaw 命令: {:?}", args);
     
     let openclaw_path = get_openclaw_path().ok_or_else(|| {
         warn!("[Shell] 找不到 openclaw 命令");
-        "找不到 openclaw 命令，请确保已通过 npm install -g @qingchencloud/openclaw-zh 安装".to_string()
+        "找不到 openclaw 命令，请确保已通过 npm install -g @jerryan999/openclaw-zh 安装".to_string()
     })?;
     
     debug!("[Shell] openclaw 路径: {}", openclaw_path);
@@ -450,7 +534,7 @@ pub fn spawn_openclaw_gateway() -> io::Result<()> {
         warn!("[Shell] 找不到 openclaw 命令");
         io::Error::new(
             io::ErrorKind::NotFound,
-            "找不到 openclaw 命令，请确保已通过 npm install -g @qingchencloud/openclaw-zh 安装"
+            "找不到 openclaw 命令，请确保已通过 npm install -g @jerryan999/openclaw-zh 安装"
         )
     })?;
     

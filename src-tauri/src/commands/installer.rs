@@ -517,8 +517,12 @@ if (-not $nodeVersion) {
     exit 1
 }
 
-Write-Host "使用 npm 安装 OpenClaw 中文版..."
-npm install -g @qingchencloud/openclaw-zh@latest --unsafe-perm
+Write-Host "使用 npm 安装 OpenClaw 中文版（无广告版）..."
+npm install -g @jerryan999/openclaw-zh --unsafe-perm
+
+# 刷新 PATH，确保能找到新安装的 openclaw 命令
+$npmPrefix = npm prefix -g
+$env:Path = "$env:Path;$npmPrefix"
 
 # 验证安装
 $openclawVersion = openclaw --version 2>$null
@@ -564,8 +568,12 @@ if ! command -v node &> /dev/null; then
     exit 1
 fi
 
-echo "使用 npm 安装 OpenClaw 中文版..."
-npm install -g @qingchencloud/openclaw-zh@latest --unsafe-perm
+echo "使用 npm 安装 OpenClaw 中文版（无广告版）..."
+npm install -g @jerryan999/openclaw-zh --unsafe-perm
+
+# 刷新命令缓存，确保能找到新安装的 openclaw 命令
+hash -r 2>/dev/null || true
+export PATH="$PATH:$(npm prefix -g)/bin"
 
 # 验证安装
 openclaw --version
@@ -764,8 +772,8 @@ Write-Host "    OpenClaw 安装向导" -ForegroundColor White
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-Write-Host "正在安装 OpenClaw 中文版..." -ForegroundColor Yellow
-npm install -g @qingchencloud/openclaw-zh@latest
+Write-Host "正在安装 OpenClaw 中文版（无广告版）..." -ForegroundColor Yellow
+npm install -g @jerryan999/openclaw-zh
 
 Write-Host ""
 Write-Host "初始化配置..."
@@ -788,8 +796,12 @@ echo "    OpenClaw 安装向导"
 echo "========================================"
 echo ""
 
-echo "正在安装 OpenClaw 中文版..."
-npm install -g @qingchencloud/openclaw-zh@latest
+echo "正在安装 OpenClaw 中文版（无广告版）..."
+npm install -g @jerryan999/openclaw-zh
+
+# 刷新命令缓存，确保能找到新安装的 openclaw 命令
+hash -r 2>/dev/null || true
+export PATH="$PATH:$(npm prefix -g)/bin"
 
 echo ""
 echo "初始化配置..."
@@ -830,8 +842,12 @@ echo "    OpenClaw 安装向导"
 echo "========================================"
 echo ""
 
-echo "正在安装 OpenClaw 中文版..."
-npm install -g @qingchencloud/openclaw-zh@latest
+echo "正在安装 OpenClaw 中文版（无广告版）..."
+npm install -g @jerryan999/openclaw-zh
+
+# 刷新命令缓存，确保能找到新安装的 openclaw 命令
+hash -r 2>/dev/null || true
+export PATH="$PATH:$(npm prefix -g)/bin"
 
 echo ""
 echo "初始化配置..."
@@ -869,7 +885,7 @@ read -p "按回车键关闭..."
             }
         }
         
-        Err("无法启动终端，请手动运行: npm install -g @qingchencloud/openclaw-zh".to_string())
+        Err("无法启动终端，请手动运行: npm install -g @jerryan999/openclaw-zh".to_string())
     }
 }
 
@@ -1121,9 +1137,9 @@ pub async fn update_openclaw() -> Result<InstallResult, String> {
 
 /// Windows 更新 OpenClaw
 async fn update_openclaw_windows() -> Result<InstallResult, String> {
-    info!("[更新OpenClaw] 执行 npm install -g @qingchencloud/openclaw-zh@latest...");
+    info!("[更新OpenClaw] 执行 npm install -g @jerryan999/openclaw-zh...");
     
-    match shell::run_cmd_output("npm install -g @qingchencloud/openclaw-zh@latest") {
+    match shell::run_cmd_output("npm install -g @jerryan999/openclaw-zh") {
         Ok(output) => {
             info!("[更新OpenClaw] npm 输出: {}", output);
             
@@ -1151,7 +1167,7 @@ async fn update_openclaw_windows() -> Result<InstallResult, String> {
 async fn update_openclaw_unix() -> Result<InstallResult, String> {
     let script = r#"
 echo "更新 OpenClaw..."
-npm install -g @qingchencloud/openclaw-zh@latest
+npm install -g @jerryan999/openclaw-zh
 
 # 验证更新
 openclaw --version
