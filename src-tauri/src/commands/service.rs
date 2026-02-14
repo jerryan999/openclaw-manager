@@ -90,7 +90,7 @@ pub async fn start_service() -> Result<String, String> {
     let openclaw_path = shell::get_openclaw_path();
     if openclaw_path.is_none() {
         info!("[服务] 找不到 openclaw 命令");
-        return Err("找不到 openclaw 命令，请先通过 npm install -g openclaw 安装".to_string());
+        return Err("找不到 openclaw 命令，请先通过 npm install -g @jerryan999/openclaw-zh 安装".to_string());
     }
     info!("[服务] openclaw 路径: {:?}", openclaw_path);
     

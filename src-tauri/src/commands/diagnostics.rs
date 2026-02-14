@@ -1,5 +1,5 @@
 use crate::models::{AITestResult, ChannelTestResult, DiagnosticResult, SystemInfo};
-use crate::utils::{platform, shell};
+use crate::utils::{file, platform, shell};
 use tauri::command;
 use log::{info, warn, error, debug};
 
@@ -102,7 +102,7 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
         suggestion: if openclaw_installed {
             None
         } else {
-            Some("运行: npm install -g openclaw".to_string())
+            Some("运行: npm install -g @jerryan999/openclaw-zh".to_string())
         },
     });
     
@@ -171,41 +171,42 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
     Ok(results)
 }
 
-/// 测试 AI 连接
+/// 测试 AI 连接（使用 openclaw agent，在临时工作区中执行以避免 Missing workspace template）
 #[command]
 pub async fn test_ai_connection() -> Result<AITestResult, String> {
     info!("[AI测试] 开始测试 AI 连接...");
-    
-    // 获取当前配置的 provider
+
+    let workspace = shell::create_agent_test_workspace()
+        .map_err(|e| format!("创建测试工作区失败: {}", e))?;
+
     let start = std::time::Instant::now();
-    
-    // 使用 openclaw 命令测试连接
     info!("[AI测试] 执行: openclaw agent --local --to +1234567890 --message 回复 OK");
-    let result = shell::run_openclaw(&["agent", "--local", "--to", "+1234567890", "--message", "回复 OK"]);
-    
+    let result = shell::run_openclaw_with_cwd(
+        &["agent", "--local", "--to", "+1234567890", "--message", "回复 OK"],
+        &workspace,
+    );
     let latency = start.elapsed().as_millis() as u64;
     info!("[AI测试] 命令执行完成, 耗时: {}ms", latency);
-    
+
+    // 尝试删除临时工作区（忽略失败）
+    let _ = std::fs::remove_dir_all(&workspace);
+
     match result {
         Ok(output) => {
             debug!("[AI测试] 原始输出: {}", output);
-            // 过滤掉警告信息
             let filtered: String = output
                 .lines()
                 .filter(|l: &&str| !l.contains("ExperimentalWarning"))
                 .collect::<Vec<&str>>()
                 .join("\n");
-            
             let success = !filtered.to_lowercase().contains("error")
                 && !filtered.contains("401")
                 && !filtered.contains("403");
-            
             if success {
                 info!("[AI测试] ✓ AI 连接测试成功");
             } else {
                 warn!("[AI测试] ✗ AI 连接测试失败: {}", filtered);
             }
-            
             Ok(AITestResult {
                 success,
                 provider: "current".to_string(),
@@ -251,9 +252,43 @@ fn channel_needs_send_test(channel_type: &str) -> bool {
     match channel_type.to_lowercase().as_str() {
         // 这些渠道需要发送测试消息来验证
         "telegram" | "discord" | "slack" | "feishu" => true,
-        // WhatsApp 和 iMessage 只检查状态，不发送测试消息
-        "whatsapp" | "imessage" => false,
+        // 只检查状态，不发送测试消息（无测试目标或需在客户端验证）
+        "whatsapp" | "imessage" | "qqbot" => false,
         _ => false,
+    }
+}
+
+/// 从 openclaw.json 检查插件渠道是否已配置（当 channels status 未列出该渠道时使用）
+fn is_plugin_channel_configured_in_config(channel_id: &str) -> Option<String> {
+    let config_path = platform::get_config_file_path();
+    if !file::file_exists(&config_path) {
+        return None;
+    }
+    let content = file::read_file(&config_path).ok()?;
+    let config: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let channels = config.get("channels")?.as_object()?;
+    let ch = channels.get(channel_id)?;
+    let ch_obj = ch.as_object()?;
+    match channel_id {
+        "qqbot" => {
+            let app_id = ch_obj.get("appId").and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+            let client_secret = ch_obj.get("clientSecret").and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+            if app_id.is_some() && client_secret.is_some() {
+                Some("已配置（请启动 Gateway 并与 QQ 机器人私聊验证）".to_string())
+            } else {
+                None
+            }
+        }
+        "feishu" => {
+            let app_id = ch_obj.get("appId").and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+            let app_secret = ch_obj.get("appSecret").and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+            if app_id.is_some() && app_secret.is_some() {
+                Some("已配置（请启动 Gateway 验证）".to_string())
+            } else {
+                None
+            }
+        }
+        _ => None,
     }
 }
 
@@ -337,10 +372,16 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
                         }
                     }
                 }
-                
+                // 若 status 未列出该渠道，对插件渠道（qqbot/feishu）尝试从配置文件判断是否已配置
                 if !channel_ok {
-                    debug_info = format!("无法解析 {} 的状态", channel_type);
-                    info!("[渠道测试] {}", debug_info);
+                    if let Some(msg) = is_plugin_channel_configured_in_config(&channel_lower) {
+                        channel_ok = true;
+                        status_message = msg;
+                        info!("[渠道测试] {} 从配置文件判定已配置", channel_type);
+                    } else {
+                        debug_info = format!("无法解析 {} 的状态", channel_type);
+                        info!("[渠道测试] {}", debug_info);
+                    }
                 }
             }
         }

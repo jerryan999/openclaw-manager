@@ -170,6 +170,7 @@ export const api = {
   getAIProviders: () => invokeWithLog<AIProviderOption[]>('get_ai_providers'),
 
   // AI 配置（新版）
+  getRecommendedProviders: () => invokeWithLog<OfficialProvider[]>('get_recommended_providers'),
   getOfficialProviders: () => invokeWithLog<OfficialProvider[]>('get_official_providers'),
   getAIConfig: () => invokeWithLog<AIConfigOverview>('get_ai_config'),
   saveProvider: (

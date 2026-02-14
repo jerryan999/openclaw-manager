@@ -178,6 +178,158 @@ pub async fn get_dashboard_url() -> Result<String, String> {
 
 // ============ AI 配置相关命令 ============
 
+/// 获取推荐 Provider 列表（与官方并列，展示在官方前）
+#[command]
+pub async fn get_recommended_providers() -> Result<Vec<OfficialProvider>, String> {
+    info!("[推荐 Provider] 获取推荐 Provider 列表...");
+    let providers = vec![
+        OfficialProvider {
+            id: "duojie".to_string(),
+            name: "Duojie AI (Openai协议)".to_string(),
+            icon: "⭐".to_string(),
+            default_base_url: Some("https://api.duojieai.com/v1".to_string()),
+            api_type: "openai-completions".to_string(),
+            requires_api_key: true,
+            docs_url: None,
+            suggested_models: vec![
+                SuggestedModel {
+                    id: "gpt-5-mini".to_string(),
+                    name: "GPT-5 Mini".to_string(),
+                    description: Some("更快更省；适合日常对话与轻量任务".to_string()),
+                    context_window: Some(128000),
+                    max_tokens: Some(8192),
+                    recommended: true,
+                },
+                SuggestedModel {
+                    id: "claude-haiku-4-5-20251001".to_string(),
+                    name: "Claude Haiku 4.5".to_string(),
+                    description: Some("轻量低价；响应快".to_string()),
+                    context_window: Some(200000),
+                    max_tokens: Some(8192),
+                    recommended: true,
+                },
+                SuggestedModel {
+                    id: "glm-5".to_string(),
+                    name: "GLM-5".to_string(),
+                    description: Some("开源模型最强".to_string()),
+                    context_window: Some(202752),
+                    max_tokens: Some(8192),
+                    recommended: false,
+                },
+                SuggestedModel {
+                    id: "claude-sonnet-4-5-20250929".to_string(),
+                    name: "Claude Sonnet 4.5".to_string(),
+                    description: Some("均衡能力与成本；通用对话与代码".to_string()),
+                    context_window: Some(200000),
+                    max_tokens: Some(8192),
+                    recommended: false,
+                },
+                SuggestedModel {
+                    id: "kimi-k2.5".to_string(),
+                    name: "Kimi K2.5".to_string(),
+                    description: Some("适合长文本和代码任务".to_string()),
+                    context_window: Some(256000),
+                    max_tokens: Some(8192),
+                    recommended: false,
+                },
+                SuggestedModel {
+                    id: "minimax-m2.1".to_string(),
+                    name: "MiniMax M2.1".to_string(),
+                    description: Some("轻量 SOTA、低延迟、高性价比".to_string()),
+                    context_window: Some(196608),
+                    max_tokens: Some(8192),
+                    recommended: false,
+                },
+                SuggestedModel {
+                    id: "gemini-3-pro-preview".to_string(),
+                    name: "Gemini 3 Pro".to_string(),
+                    description: Some("多模态、长上下文".to_string()),
+                    context_window: Some(1048576),
+                    max_tokens: Some(65536),
+                    recommended: false,
+                },
+                SuggestedModel {
+                    id: "gemini-3-flash-preview".to_string(),
+                    name: "Gemini 3 Flash".to_string(),
+                    description: Some("高速、高性价比思维模型".to_string()),
+                    context_window: Some(1048576),
+                    max_tokens: Some(65536),
+                    recommended: false,
+                },
+                SuggestedModel {
+                    id: "grok-4".to_string(),
+                    name: "Grok 4".to_string(),
+                    description: Some("xAI 旗舰模型；强推理与多模态".to_string()),
+                    context_window: Some(128000),
+                    max_tokens: Some(8192),
+                    recommended: false,
+                },
+                SuggestedModel {
+                    id: "gpt-5.2".to_string(),
+                    name: "GPT-5.2".to_string(),
+                    description: Some("OpenAI 通用强推理与代码模型".to_string()),
+                    context_window: Some(400000),
+                    max_tokens: Some(128000),
+                    recommended: false,
+                },
+                SuggestedModel {
+                    id: "claude-opus-4-6".to_string(),
+                    name: "Claude Opus 4.6".to_string(),
+                    description: Some("顶级综合能力；最强推理与代码".to_string()),
+                    context_window: Some(200000),
+                    max_tokens: Some(8192),
+                    recommended: false,
+                },
+            ],
+        },
+        OfficialProvider {
+            id: "duojie-anthropic".to_string(),
+            name: "Duojie AI - (Anthropic协议)".to_string(),
+            icon: "⭐".to_string(),
+            default_base_url: Some("https://api.duojieai.com".to_string()),
+            api_type: "anthropic-messages".to_string(),
+            requires_api_key: true,
+            docs_url: None,
+            suggested_models: vec![
+                SuggestedModel {
+                    id: "claude-haiku-4-5-20251001".to_string(),
+                    name: "Claude Haiku 4.5".to_string(),
+                    description: Some("轻量低价；响应快".to_string()),
+                    context_window: Some(200000),
+                    max_tokens: Some(8192),
+                    recommended: true,
+                },
+                SuggestedModel {
+                    id: "claude-sonnet-4-5-20250929".to_string(),
+                    name: "Claude Sonnet 4.5".to_string(),
+                    description: Some("均衡能力与成本；通用对话与代码".to_string()),
+                    context_window: Some(200000),
+                    max_tokens: Some(8192),
+                    recommended: true,
+                },
+                SuggestedModel {
+                    id: "claude-opus-4-6".to_string(),
+                    name: "Claude Opus 4.6".to_string(),
+                    description: Some("顶级综合能力；最强推理与代码".to_string()),
+                    context_window: Some(200000),
+                    max_tokens: Some(8192),
+                    recommended: false,
+                },
+                SuggestedModel {
+                    id: "kimi-k2.5".to_string(),
+                    name: "Kimi K2.5".to_string(),
+                    description: Some("适合长文本和代码任务".to_string()),
+                    context_window: Some(256000),
+                    max_tokens: Some(8192),
+                    recommended: false,
+                },
+            ],
+        },
+    ];
+    info!("[推荐 Provider] ✓ 返回 {} 个推荐 Provider", providers.len());
+    Ok(providers)
+}
+
 /// 获取官方 Provider 列表（预设模板）
 #[command]
 pub async fn get_official_providers() -> Result<Vec<OfficialProvider>, String> {
@@ -329,12 +481,20 @@ pub async fn get_official_providers() -> Result<Vec<OfficialProvider>, String> {
             docs_url: Some("https://docs.openclaw.ai/providers/glm".to_string()),
             suggested_models: vec![
                 SuggestedModel {
+                    id: "glm-5".to_string(),
+                    name: "GLM-5".to_string(),
+                    description: Some("开源模型最强".to_string()),
+                    context_window: Some(202752),
+                    max_tokens: Some(8192),
+                    recommended: true,
+                },
+                SuggestedModel {
                     id: "glm-4".to_string(),
                     name: "GLM-4".to_string(),
                     description: Some("最新旗舰模型".to_string()),
                     context_window: Some(128000),
                     max_tokens: Some(8192),
-                    recommended: true,
+                    recommended: false,
                 },
             ],
         },
@@ -853,6 +1013,7 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
         ("imessage", "imessage", vec![]),
         ("wechat", "wechat", vec![]),
         ("dingtalk", "dingtalk", vec![]),
+        ("qqbot", "qqbot", vec![]),
     ];
     
     for (channel_id, channel_type, test_fields) in channel_types {
@@ -1144,6 +1305,106 @@ pub async fn install_feishu_plugin() -> Result<String, String> {
         Err(e) => {
             error!("[飞书插件] ✗ 安装失败: {}", e);
             Err(format!("安装飞书插件失败: {}\n\n请手动执行: openclaw plugins install @m1heng-clawd/feishu", e))
+        }
+    }
+}
+
+// ============ QQ 插件管理 ============
+
+/// QQ 插件状态
+#[derive(Debug, Serialize, Deserialize)]
+pub struct QQPluginStatus {
+    pub installed: bool,
+    pub version: Option<String>,
+    pub plugin_name: Option<String>,
+}
+
+/// 检查 QQ 插件是否已安装
+#[command]
+pub async fn check_qq_plugin() -> Result<QQPluginStatus, String> {
+    info!("[QQ插件] 检查 QQ 插件安装状态...");
+    
+    // 执行 openclaw plugins list 命令
+    match shell::run_openclaw(&["plugins", "list"]) {
+        Ok(output) => {
+            debug!("[QQ插件] plugins list 输出: {}", output);
+            
+            // 查找 qqbot 插件（@sliverp/qqbot）
+            let lines: Vec<&str> = output.lines().collect();
+            let qq_line = lines.iter().find(|line| {
+                let lower = line.to_lowercase();
+                lower.contains("qqbot") || lower.contains("sliverp/qqbot")
+            });
+            
+            if let Some(line) = qq_line {
+                info!("[QQ插件] ✓ QQ 插件已安装: {}", line);
+                
+                // 尝试解析版本号
+                let version = if line.contains('@') {
+                    line.split('@').last().map(|s| s.trim().to_string())
+                } else {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    parts.iter()
+                        .find(|p| p.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
+                        .map(|s| s.to_string())
+                };
+                
+                Ok(QQPluginStatus {
+                    installed: true,
+                    version,
+                    plugin_name: Some(line.trim().to_string()),
+                })
+            } else {
+                info!("[QQ插件] ✗ QQ 插件未安装");
+                Ok(QQPluginStatus {
+                    installed: false,
+                    version: None,
+                    plugin_name: None,
+                })
+            }
+        }
+        Err(e) => {
+            warn!("[QQ插件] 检查插件列表失败: {}", e);
+            Ok(QQPluginStatus {
+                installed: false,
+                version: None,
+                plugin_name: None,
+            })
+        }
+    }
+}
+
+/// 安装 QQ 插件
+#[command]
+pub async fn install_qq_plugin() -> Result<String, String> {
+    info!("[QQ插件] 开始安装 QQ 插件...");
+    
+    // 先检查是否已安装
+    let status = check_qq_plugin().await?;
+    if status.installed {
+        info!("[QQ插件] QQ 插件已安装，跳过");
+        return Ok(format!("QQ 插件已安装: {}", status.plugin_name.unwrap_or_default()));
+    }
+    
+    // 安装 QQ 插件：使用 @sliverp/qqbot（官方 QQ 开放平台长连接方案）
+    info!("[QQ插件] 执行 openclaw plugins install @sliverp/qqbot@latest ...");
+    match shell::run_openclaw(&["plugins", "install", "@sliverp/qqbot@latest"]) {
+        Ok(output) => {
+            info!("[QQ插件] 安装输出: {}", output);
+            
+            // 验证安装结果
+            let verify_status = check_qq_plugin().await?;
+            if verify_status.installed {
+                info!("[QQ插件] ✓ QQ 插件安装成功");
+                Ok(format!("QQ 插件安装成功: {}", verify_status.plugin_name.unwrap_or_default()))
+            } else {
+                warn!("[QQ插件] 安装命令执行成功但插件未找到");
+                Err("安装命令执行成功但插件未找到，请检查 openclaw 版本".to_string())
+            }
+        }
+        Err(e) => {
+            error!("[QQ插件] ✗ 安装失败: {}", e);
+            Err(format!("安装 QQ 插件失败: {}\n\n请手动执行: openclaw plugins install @sliverp/qqbot@latest", e))
         }
     }
 }

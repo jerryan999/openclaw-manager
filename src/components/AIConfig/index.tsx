@@ -93,6 +93,7 @@ interface AITestResult {
 // ============ 添加/编辑 Provider 对话框 ============
 
 interface ProviderDialogProps {
+  recommendedProviders: OfficialProvider[];
   officialProviders: OfficialProvider[];
   onClose: () => void;
   onSave: () => void;
@@ -100,12 +101,13 @@ interface ProviderDialogProps {
   editingProvider?: ConfiguredProvider | null;
 }
 
-function ProviderDialog({ officialProviders, onClose, onSave, editingProvider }: ProviderDialogProps) {
+function ProviderDialog({ recommendedProviders, officialProviders, onClose, onSave, editingProvider }: ProviderDialogProps) {
+  const allProviders = [...recommendedProviders, ...officialProviders];
   const isEditing = !!editingProvider;
   const [step, setStep] = useState<'select' | 'configure'>(isEditing ? 'configure' : 'select');
   const [selectedOfficial, setSelectedOfficial] = useState<OfficialProvider | null>(() => {
     if (editingProvider) {
-      return officialProviders.find(p => 
+      return allProviders.find(p =>
         editingProvider.name.includes(p.id) || p.id === editingProvider.name
       ) || null;
     }
@@ -135,9 +137,9 @@ function ProviderDialog({ officialProviders, onClose, onSave, editingProvider }:
   const [formError, setFormError] = useState<string | null>(null);
   const [showCustomUrlWarning, setShowCustomUrlWarning] = useState(false);
 
-  // 检查是否是官方 Provider 名字但使用了自定义地址
+  // 检查是否是预设 Provider 名字但使用了自定义地址（推荐或官方）
   const isCustomUrlWithOfficialName = (() => {
-    const official = officialProviders.find(p => p.id === providerName);
+    const official = allProviders.find(p => p.id === providerName);
     if (official && official.default_base_url && baseUrl !== official.default_base_url) {
       return true;
     }
@@ -291,28 +293,53 @@ function ProviderDialog({ officialProviders, onClose, onSave, editingProvider }:
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-4"
               >
+                {/* 推荐供应商 */}
+                {recommendedProviders.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-gray-400">推荐供应商</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {recommendedProviders.map(provider => (
+                        <button
+                          key={provider.id}
+                          onClick={() => handleSelectOfficial(provider)}
+                          className="flex items-center gap-3 p-4 rounded-xl bg-dark-700 border border-dark-500 hover:border-claw-500/50 hover:bg-dark-600 transition-all text-left group"
+                        >
+                          <span className="text-2xl">{provider.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-white truncate">{provider.name}</p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {provider.suggested_models.length} 个模型
+                            </p>
+                          </div>
+                          <ChevronRight size={16} className="text-gray-500 group-hover:text-claw-400 transition-colors" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* 官方 Provider */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-gray-400">官方 Provider</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {officialProviders.map(provider => (
-                <button
-                  key={provider.id}
+                      <button
+                        key={provider.id}
                         onClick={() => handleSelectOfficial(provider)}
                         className="flex items-center gap-3 p-4 rounded-xl bg-dark-700 border border-dark-500 hover:border-claw-500/50 hover:bg-dark-600 transition-all text-left group"
-                >
-                  <span className="text-2xl">{provider.icon}</span>
+                      >
+                        <span className="text-2xl">{provider.icon}</span>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-white truncate">{provider.name}</p>
                           <p className="text-xs text-gray-500 truncate">
                             {provider.suggested_models.length} 个模型
                           </p>
-                    </div>
+                        </div>
                         <ChevronRight size={16} className="text-gray-500 group-hover:text-claw-400 transition-colors" />
-                </button>
+                      </button>
                     ))}
-          </div>
-        </div>
+                  </div>
+                </div>
 
                 {/* 自定义 Provider */}
                 <div className="pt-4 border-t border-dark-600">
@@ -842,6 +869,7 @@ function ProviderCard({ provider, officialProviders, onSetPrimary, onRefresh, on
 
 export function AIConfig() {
   const [loading, setLoading] = useState(true);
+  const [recommendedProviders, setRecommendedProviders] = useState<OfficialProvider[]>([]);
   const [officialProviders, setOfficialProviders] = useState<OfficialProvider[]>([]);
   const [aiConfig, setAiConfig] = useState<AIConfigOverview | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -892,13 +920,15 @@ export function AIConfig() {
     setError(null);
     
     try {
-      const [officials, config] = await Promise.all([
+      const [recommended, officials, config] = await Promise.all([
+        invoke<OfficialProvider[]>('get_recommended_providers'),
         invoke<OfficialProvider[]>('get_official_providers'),
         invoke<AIConfigOverview>('get_ai_config'),
       ]);
+      setRecommendedProviders(recommended);
       setOfficialProviders(officials);
       setAiConfig(config);
-      aiLogger.info(`加载完成: ${officials.length} 个官方 Provider, ${config.configured_providers.length} 个已配置`);
+      aiLogger.info(`加载完成: ${recommended.length} 个推荐 Provider, ${officials.length} 个官方 Provider, ${config.configured_providers.length} 个已配置`);
     } catch (e) {
       aiLogger.error('加载 AI 配置失败', e);
       setError(String(e));
@@ -1078,7 +1108,7 @@ export function AIConfig() {
                 <ProviderCard
                   key={provider.name}
                   provider={provider}
-                  officialProviders={officialProviders}
+                  officialProviders={[...recommendedProviders, ...officialProviders]}
                   onSetPrimary={handleSetPrimary}
                   onRefresh={loadData}
                   onEdit={handleEditProvider}
@@ -1135,6 +1165,7 @@ export function AIConfig() {
       <AnimatePresence>
         {showAddDialog && (
           <ProviderDialog
+            recommendedProviders={recommendedProviders}
             officialProviders={officialProviders}
             onClose={handleCloseDialog}
             onSave={loadData}
