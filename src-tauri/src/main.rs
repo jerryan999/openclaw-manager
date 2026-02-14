@@ -47,6 +47,7 @@ fn main() {
             config::get_or_create_gateway_token,
             config::get_dashboard_url,
             // AI 配置管理
+            config::get_recommended_providers,
             config::get_official_providers,
             config::get_ai_config,
             config::save_provider,
@@ -57,6 +58,9 @@ fn main() {
             // 飞书插件管理
             config::check_feishu_plugin,
             config::install_feishu_plugin,
+            // QQ 插件管理
+            config::check_qq_plugin,
+            config::install_qq_plugin,
             // 诊断测试
             diagnostics::run_doctor,
             diagnostics::test_ai_connection,

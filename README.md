@@ -51,7 +51,8 @@
 </table>
 
 - **Telegram** - Bot Token 配置、私聊/群组策略
-- **飞书** - App ID/Secret、WebSocket 连接、多部署区域
+- **飞书** - App ID/Secret、WebSocket 连接、多部署区域（需安装插件）
+- **QQ** - QQ 开放平台官方长连接（需安装 @sliverp/qqbot 插件）
 - **更多渠道** - Discord、Slack、WhatsApp、iMessage、微信、钉钉
 
 ---
@@ -62,7 +63,8 @@
 |------|------|
 | 📊 **仪表盘** | 实时服务状态监控、进程内存统计、一键启动/停止/重启 |
 | 🤖 **AI 配置** | 14+ AI 提供商、自定义 API 地址、模型快速切换 |
-| 📱 **消息渠道** | Telegram、Discord、Slack、飞书、微信、iMessage、钉钉 |
+| 📱 **消息渠道** | Telegram、Discord、Slack、飞书*、微信、iMessage、钉钉、QQ* |
+| 🔌 **插件管理** | 自动检测和安装渠道插件（飞书、QQ 等） |
 | ⚡ **服务管理** | 后台服务控制、实时日志、开机自启 |
 | 🧪 **测试诊断** | 系统环境检查、AI 连接测试、渠道连通性测试 |
 
@@ -277,10 +279,24 @@ cd src-tauri && cargo test
 
 MIT License - 详见 [LICENSE](LICENSE)
 
+## 📋 渠道插件说明
+
+部分渠道需要额外安装插件才能使用：
+
+### 内置渠道（无需插件）
+- Telegram、Discord、Slack、WhatsApp、iMessage、微信、钉钉
+
+### 需要插件的渠道
+- **飞书** - 需要安装 `@m1heng-clawd/feishu` 插件
+- **QQ** - 需要安装 `@sliverp/qqbot` 插件（QQ 开放平台）
+
+应用会自动检测插件状态，并提供一键安装功能。QQ 渠道使用 [@sliverp/qqbot](https://github.com/sliverp/qqbot)，配置 `appId` 与 `clientSecret`。详见 [QQ 渠道配置指南](docs/QQ_CHANNEL_SETUP.md)。
+
 ## 🔗 相关链接
 
 - [OpenClaw Manager](https://github.com/miaoxworld/openclaw-manager) - 图形界面版本（本项目）
 - [OpenClawInstaller](https://github.com/miaoxworld/OpenClawInstaller) - 命令行版本
+- [OpenClaw 插件文档](https://docs.clawd.bot/plugins) - 官方插件文档
 - [Tauri 官方文档](https://tauri.app/)
 - [React 官方文档](https://react.dev/)
 

@@ -1,5 +1,5 @@
 use crate::models::{AITestResult, ChannelTestResult, DiagnosticResult, SystemInfo};
-use crate::utils::{platform, shell};
+use crate::utils::{file, platform, shell};
 use tauri::command;
 use log::{info, warn, error, debug};
 
@@ -251,9 +251,43 @@ fn channel_needs_send_test(channel_type: &str) -> bool {
     match channel_type.to_lowercase().as_str() {
         // 这些渠道需要发送测试消息来验证
         "telegram" | "discord" | "slack" | "feishu" => true,
-        // WhatsApp 和 iMessage 只检查状态，不发送测试消息
-        "whatsapp" | "imessage" => false,
+        // 只检查状态，不发送测试消息（无测试目标或需在客户端验证）
+        "whatsapp" | "imessage" | "qqbot" => false,
         _ => false,
+    }
+}
+
+/// 从 openclaw.json 检查插件渠道是否已配置（当 channels status 未列出该渠道时使用）
+fn is_plugin_channel_configured_in_config(channel_id: &str) -> Option<String> {
+    let config_path = platform::get_config_file_path();
+    if !file::file_exists(&config_path) {
+        return None;
+    }
+    let content = file::read_file(&config_path).ok()?;
+    let config: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let channels = config.get("channels")?.as_object()?;
+    let ch = channels.get(channel_id)?;
+    let ch_obj = ch.as_object()?;
+    match channel_id {
+        "qqbot" => {
+            let app_id = ch_obj.get("appId").and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+            let client_secret = ch_obj.get("clientSecret").and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+            if app_id.is_some() && client_secret.is_some() {
+                Some("已配置（请启动 Gateway 并与 QQ 机器人私聊验证）".to_string())
+            } else {
+                None
+            }
+        }
+        "feishu" => {
+            let app_id = ch_obj.get("appId").and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+            let app_secret = ch_obj.get("appSecret").and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+            if app_id.is_some() && app_secret.is_some() {
+                Some("已配置（请启动 Gateway 验证）".to_string())
+            } else {
+                None
+            }
+        }
+        _ => None,
     }
 }
 
@@ -337,10 +371,16 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
                         }
                     }
                 }
-                
+                // 若 status 未列出该渠道，对插件渠道（qqbot/feishu）尝试从配置文件判断是否已配置
                 if !channel_ok {
-                    debug_info = format!("无法解析 {} 的状态", channel_type);
-                    info!("[渠道测试] {}", debug_info);
+                    if let Some(msg) = is_plugin_channel_configured_in_config(&channel_lower) {
+                        channel_ok = true;
+                        status_message = msg;
+                        info!("[渠道测试] {} 从配置文件判定已配置", channel_type);
+                    } else {
+                        debug_info = format!("无法解析 {} 的状态", channel_type);
+                        info!("[渠道测试] {}", debug_info);
+                    }
                 }
             }
         }

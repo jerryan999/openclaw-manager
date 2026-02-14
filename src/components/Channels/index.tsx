@@ -32,6 +32,12 @@ interface FeishuPluginStatus {
   plugin_name: string | null;
 }
 
+interface QQPluginStatus {
+  installed: boolean;
+  version: string | null;
+  plugin_name: string | null;
+}
+
 interface ChannelConfig {
   id: string;
   channel_type: string;
@@ -184,6 +190,16 @@ const channelInfo: Record<
     ],
     helpText: '从钉钉开放平台获取',
   },
+  qqbot: {
+    name: 'QQ',
+    icon: <MessageCircle size={20} />,
+    color: 'text-cyan-400',
+    fields: [
+      { key: 'appId', label: 'App ID', type: 'text', placeholder: 'QQ 开放平台机器人 AppID', required: true },
+      { key: 'clientSecret', label: 'App Secret', type: 'password', placeholder: 'QQ 开放平台机器人 AppSecret', required: true },
+    ],
+    helpText: '从 QQ 开放平台创建 QQ 机器人，获取 AppID 与 AppSecret。插件：@sliverp/qqbot',
+  },
 };
 
 interface TestResult {
@@ -208,6 +224,11 @@ export function Channels() {
   const [feishuPluginStatus, setFeishuPluginStatus] = useState<FeishuPluginStatus | null>(null);
   const [feishuPluginLoading, setFeishuPluginLoading] = useState(false);
   const [feishuPluginInstalling, setFeishuPluginInstalling] = useState(false);
+  
+  // QQ 插件状态
+  const [qqPluginStatus, setQQPluginStatus] = useState<QQPluginStatus | null>(null);
+  const [qqPluginLoading, setQQPluginLoading] = useState(false);
+  const [qqPluginInstalling, setQQPluginInstalling] = useState(false);
   
   // 跟踪哪些密码字段显示明文
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
@@ -250,6 +271,35 @@ export function Channels() {
       alert('安装失败: ' + e);
     } finally {
       setFeishuPluginInstalling(false);
+    }
+  };
+  
+  // 检查 QQ 插件状态
+  const checkQQPlugin = async () => {
+    setQQPluginLoading(true);
+    try {
+      const status = await invoke<QQPluginStatus>('check_qq_plugin');
+      setQQPluginStatus(status);
+    } catch (e) {
+      console.error('检查 QQ 插件失败:', e);
+      setQQPluginStatus({ installed: false, version: null, plugin_name: null });
+    } finally {
+      setQQPluginLoading(false);
+    }
+  };
+  
+  // 安装 QQ 插件
+  const handleInstallQQPlugin = async () => {
+    setQQPluginInstalling(true);
+    try {
+      const result = await invoke<string>('install_qq_plugin');
+      alert(result);
+      // 刷新插件状态
+      await checkQQPlugin();
+    } catch (e) {
+      alert('安装失败: ' + e);
+    } finally {
+      setQQPluginInstalling(false);
     }
   };
   
@@ -416,6 +466,11 @@ export function Channels() {
       if (channel.channel_type === 'feishu') {
         checkFeishuPlugin();
       }
+      
+      // 如果选择的是 QQ 渠道，检查插件状态
+      if (channel.channel_type === 'qqbot') {
+        checkQQPlugin();
+      }
     } else {
       setConfigForm({});
     }
@@ -578,6 +633,66 @@ export function Channels() {
                     )}
                   </div>
                 </div>
+
+                {/* QQ 插件状态提示 */}
+                {currentChannel.channel_type === 'qqbot' && (
+                  <div className="mb-4">
+                    {qqPluginLoading ? (
+                      <div className="p-4 bg-dark-600 rounded-xl border border-dark-500 flex items-center gap-3">
+                        <Loader2 size={20} className="animate-spin text-gray-400" />
+                        <span className="text-gray-400">正在检查 QQ 插件状态...</span>
+                      </div>
+                    ) : qqPluginStatus?.installed ? (
+                      <div className="p-4 bg-green-500/10 rounded-xl border border-green-500/30 flex items-center gap-3">
+                        <Package size={20} className="text-green-400" />
+                        <div className="flex-1">
+                          <p className="text-green-400 font-medium">QQ 插件已安装</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {qqPluginStatus.plugin_name || '@sliverp/qqbot'}
+                            {qqPluginStatus.version && ` v${qqPluginStatus.version}`}
+                          </p>
+                        </div>
+                        <CheckCircle size={16} className="text-green-400" />
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-amber-500/10 rounded-xl border border-amber-500/30">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle size={20} className="text-amber-400 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-amber-400 font-medium">需要安装 QQ 插件</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              使用 QQ 开放平台官方长连接，需先安装 @sliverp/qqbot 插件。
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                onClick={handleInstallQQPlugin}
+                                disabled={qqPluginInstalling}
+                                className="btn-primary flex items-center gap-2 text-sm py-2"
+                              >
+                                {qqPluginInstalling ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <Download size={14} />
+                                )}
+                                {qqPluginInstalling ? '安装中...' : '一键安装插件'}
+                              </button>
+                              <button
+                                onClick={checkQQPlugin}
+                                disabled={qqPluginLoading}
+                                className="btn-secondary flex items-center gap-2 text-sm py-2"
+                              >
+                                刷新状态
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">
+                              或手动执行: <code className="px-1.5 py-0.5 bg-dark-600 rounded text-gray-400">openclaw plugins install @sliverp/qqbot@latest</code>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* 飞书插件状态提示 */}
                 {currentChannel.channel_type === 'feishu' && (
