@@ -219,7 +219,9 @@ openclaw-manager/
 
 ## 📦 构建产物
 
-运行 `npm run tauri:build` 后，会在 `src-tauri/target/release/bundle/` 生成：
+**CI 自动构建**：推送版本 tag（如 `v0.0.5`）后，[GitHub Actions](.github/workflows/build.yml) 会自动同时构建 macOS 与 Windows 版本，并创建 **GitHub Release**，安装包可直接在 [Releases](https://github.com/miaoxworld/openclaw-manager/releases) 页面下载。
+
+本地运行 `npm run tauri:build` 后，会在 `src-tauri/target/release/bundle/` 生成：
 
 | 平台 | 格式 |
 |------|------|

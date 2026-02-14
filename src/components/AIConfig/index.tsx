@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-shell';
 import {
   Check,
   Eye,
@@ -451,6 +452,19 @@ function ProviderDialog({ recommendedProviders, officialProviders, onClose, onSa
                       💡 如果不需要更改 API Key，请保持为空
                     </p>
                   )}
+                  {(selectedOfficial?.id === 'duojie' || selectedOfficial?.id === 'duojie-anthropic') && (
+                    <p className="text-xs text-gray-400 mt-2 flex flex-wrap items-center gap-1">
+                      <span>未注册？</span>
+                      <button
+                        type="button"
+                        onClick={() => open('https://api.duojieai.com/register?aff=EZf2')}
+                        className="text-claw-400 hover:underline bg-transparent border-0 p-0 cursor-pointer"
+                      >
+                        前往注册
+                      </button>
+                      <span>→ 复制 API Key 填入上方</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* API 类型 */}
@@ -555,15 +569,14 @@ function ProviderDialog({ recommendedProviders, officialProviders, onClose, onSa
 
                 {/* 文档链接 */}
                 {selectedOfficial?.docs_url && (
-                  <a
-                    href={selectedOfficial.docs_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-claw-400 hover:text-claw-300"
+                  <button
+                    type="button"
+                    onClick={() => open(selectedOfficial.docs_url!)}
+                    className="inline-flex items-center gap-1 text-sm text-claw-400 hover:text-claw-300 bg-transparent border-0 p-0 cursor-pointer"
                   >
                     <ExternalLink size={14} />
                     查看官方文档
-                  </a>
+                  </button>
                 )}
 
                 {/* 表单错误提示 */}

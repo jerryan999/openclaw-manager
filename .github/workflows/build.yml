@@ -1,0 +1,85 @@
+name: Build (macOS + Windows)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            name: macos
+          - platform: windows-latest
+            name: windows
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        run: npm run tauri build
+
+      - name: Upload macOS artifacts
+        if: matrix.name == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openclaw-manager-macos
+          path: src-tauri/target/release/bundle/
+
+      - name: Upload Windows artifacts
+        if: matrix.name == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openclaw-manager-windows
+          path: src-tauri/target/release/bundle/
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: openclaw-manager-macos
+          path: openclaw-manager-macos
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: openclaw-manager-windows
+          path: openclaw-manager-windows
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            openclaw-manager-macos/**/*
+            openclaw-manager-windows/**/*
