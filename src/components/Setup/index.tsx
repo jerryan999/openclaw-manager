@@ -318,23 +318,25 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                   onClick={handleInstallOpenclaw}
                   disabled={
                     installing !== null || 
-                    !envStatus.node_version_ok || 
+                    (!envStatus.node_version_ok && !envStatus.has_bundled_nodejs) ||
                     (envStatus.os === 'windows' && !envStatus.has_offline_package && !envStatus.git_installed)
                   }
                   className={`btn-primary text-sm px-4 py-2 flex items-center gap-2 ${
-                    !envStatus.node_version_ok || 
+                    (!envStatus.node_version_ok && !envStatus.has_bundled_nodejs) ||
                     (envStatus.os === 'windows' && !envStatus.has_offline_package && !envStatus.git_installed)
                       ? 'opacity-50 cursor-not-allowed' 
                       : ''
                   }`}
                   title={
-                    !envStatus.node_version_ok 
-                      ? '请先安装 Node.js' 
+                    (!envStatus.node_version_ok && !envStatus.has_bundled_nodejs)
+                      ? '请先安装 Node.js（或下载内置版本）' 
                       : (envStatus.os === 'windows' && !envStatus.has_offline_package && !envStatus.git_installed)
                         ? '请先安装 Git（或使用包含离线包的版本）'
-                        : envStatus.has_offline_package
-                          ? '使用离线包安装，无需 Git'
-                          : ''
+                        : (envStatus.has_bundled_nodejs && envStatus.has_offline_package)
+                          ? '✨ 完全离线安装，无需任何依赖'
+                          : envStatus.has_offline_package
+                            ? '使用离线包安装，无需 Git'
+                            : ''
                   }
                 >
                   {installing === 'openclaw' ? (
@@ -345,7 +347,11 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                   ) : (
                     <>
                       <Download className="w-4 h-4" />
-                      安装{envStatus.has_offline_package && ' (离线)'}
+                      {envStatus.has_bundled_nodejs && envStatus.has_offline_package 
+                        ? '安装 (完全离线)' 
+                        : envStatus.has_offline_package 
+                          ? '安装 (离线)' 
+                          : '安装'}
                     </>
                   )}
                 </button>
