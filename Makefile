@@ -1,7 +1,7 @@
 .PHONY: help dev build release tag push bump-version clean install check
 
 # 版本号变量 - 修改这里来更新版本
-TAG := 0.0.11
+TAG := 0.0.12
 
 help: ## 显示帮助信息
 	@echo "OpenClaw Manager - 常用命令"
