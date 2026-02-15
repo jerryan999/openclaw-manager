@@ -12,6 +12,10 @@ pub struct EnvironmentStatus {
     pub node_version: Option<String>,
     /// Node.js 版本是否满足要求 (>=22)
     pub node_version_ok: bool,
+    /// Git 是否安装
+    pub git_installed: bool,
+    /// Git 版本
+    pub git_version: Option<String>,
     /// OpenClaw 是否安装
     pub openclaw_installed: bool,
     /// OpenClaw 版本
@@ -57,6 +61,13 @@ pub async fn check_environment() -> Result<EnvironmentStatus, String> {
     info!("[环境检查] Node.js: installed={}, version={:?}, version_ok={}", 
         node_installed, node_version, node_version_ok);
     
+    // 检查 Git
+    info!("[环境检查] 检查 Git...");
+    let git_version = get_git_version();
+    let git_installed = git_version.is_some();
+    info!("[环境检查] Git: installed={}, version={:?}", 
+        git_installed, git_version);
+    
     // 检查 OpenClaw
     info!("[环境检查] 检查 OpenClaw...");
     let openclaw_version = get_openclaw_version();
@@ -69,13 +80,20 @@ pub async fn check_environment() -> Result<EnvironmentStatus, String> {
     let config_dir_exists = std::path::Path::new(&config_dir).exists();
     info!("[环境检查] 配置目录: {}, exists={}", config_dir, config_dir_exists);
     
-    let ready = node_installed && node_version_ok && openclaw_installed;
+    // Windows 需要 Git 来安装 npm 包，Unix 系统不强制要求
+    let ready = if platform::is_windows() {
+        node_installed && node_version_ok && git_installed && openclaw_installed
+    } else {
+        node_installed && node_version_ok && openclaw_installed
+    };
     info!("[环境检查] 环境就绪状态: ready={}", ready);
     
     Ok(EnvironmentStatus {
         node_installed,
         node_version,
         node_version_ok,
+        git_installed,
+        git_version,
         openclaw_installed,
         openclaw_version,
         config_dir_exists,
@@ -136,6 +154,38 @@ fn get_node_version() -> Option<String> {
             if !output.is_empty() && output.starts_with('v') {
                 info!("[环境检查] 通过用户 shell 找到 Node.js: {}", output.trim());
                 return Some(output.trim().to_string());
+            }
+        }
+        
+        None
+    }
+}
+
+/// 获取 Git 版本
+fn get_git_version() -> Option<String> {
+    if platform::is_windows() {
+        // Windows: 尝试 cmd 和 PowerShell
+        if let Ok(v) = shell::run_cmd_output("git --version") {
+            if !v.is_empty() {
+                info!("[环境检查] 通过 cmd 找到 Git: {}", v.trim());
+                return Some(v.trim().to_string());
+            }
+        }
+        
+        if let Ok(v) = shell::run_powershell_output("git --version") {
+            if !v.is_empty() {
+                info!("[环境检查] 通过 PowerShell 找到 Git: {}", v.trim());
+                return Some(v.trim().to_string());
+            }
+        }
+        
+        None
+    } else {
+        // Unix: 直接调用
+        if let Ok(v) = shell::run_command_output("git", &["--version"]) {
+            if !v.is_empty() {
+                info!("[环境检查] 找到 Git: {}", v.trim());
+                return Some(v.trim().to_string());
             }
         }
         
@@ -507,6 +557,22 @@ pub async fn install_openclaw() -> Result<InstallResult, String> {
 
 /// Windows 安装 OpenClaw
 async fn install_openclaw_windows() -> Result<InstallResult, String> {
+    // 先检查 Git 是否安装
+    if get_git_version().is_none() {
+        return Ok(InstallResult {
+            success: false,
+            message: "Git 未安装".to_string(),
+            error: Some(
+                "安装 OpenClaw 需要 Git。\n\n请先安装 Git:\n\
+                1. 访问 https://git-scm.com/download/win\n\
+                2. 下载并安装 Git for Windows\n\
+                3. 安装完成后重启本应用\n\n\
+                或使用 winget 安装: winget install --id Git.Git -e --source winget"
+                    .to_string(),
+            ),
+        });
+    }
+
     let script = r#"
 $ErrorActionPreference = 'Stop'
 
@@ -514,6 +580,14 @@ $ErrorActionPreference = 'Stop'
 $nodeVersion = node --version 2>$null
 if (-not $nodeVersion) {
     Write-Host "错误：请先安装 Node.js"
+    exit 1
+}
+
+# 检查 Git
+$gitVersion = git --version 2>$null
+if (-not $gitVersion) {
+    Write-Host "错误：请先安装 Git"
+    Write-Host "下载地址: https://git-scm.com/download/win"
     exit 1
 }
 

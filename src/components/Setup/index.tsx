@@ -9,7 +9,8 @@ import {
   RefreshCw,
   ExternalLink,
   Cpu,
-  Package
+  Package,
+  GitBranch
 } from 'lucide-react';
 import { setupLogger } from '../../lib/logger';
 
@@ -17,6 +18,8 @@ interface EnvironmentStatus {
   node_installed: boolean;
   node_version: string | null;
   node_version_ok: boolean;
+  git_installed: boolean;
+  git_version: string | null;
   openclaw_installed: boolean;
   openclaw_version: string | null;
   config_dir_exists: boolean;
@@ -231,6 +234,41 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
               )}
             </div>
 
+            {/* Git 状态 (仅 Windows) */}
+            {envStatus.os === 'windows' && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${
+                    envStatus.git_installed 
+                      ? 'bg-green-500/20 text-green-400' 
+                      : 'bg-yellow-500/20 text-yellow-400'
+                  }`}>
+                    <GitBranch className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">Git</p>
+                    <p className="text-sm text-dark-400">
+                      {envStatus.git_version || '未安装 (安装 OpenClaw 需要)'}
+                    </p>
+                  </div>
+                </div>
+                
+                {envStatus.git_installed ? (
+                  <CheckCircle2 className="w-6 h-6 text-green-400" />
+                ) : (
+                  <a
+                    href="https://git-scm.com/download/win"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-primary text-sm px-4 py-2 flex items-center gap-2"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    下载
+                  </a>
+                )}
+              </div>
+            )}
+
             {/* OpenClaw 状态 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -254,11 +292,23 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
               ) : (
                 <button
                   onClick={handleInstallOpenclaw}
-                  disabled={installing !== null || !envStatus.node_version_ok}
+                  disabled={
+                    installing !== null || 
+                    !envStatus.node_version_ok || 
+                    (envStatus.os === 'windows' && !envStatus.git_installed)
+                  }
                   className={`btn-primary text-sm px-4 py-2 flex items-center gap-2 ${
-                    !envStatus.node_version_ok ? 'opacity-50 cursor-not-allowed' : ''
+                    !envStatus.node_version_ok || (envStatus.os === 'windows' && !envStatus.git_installed)
+                      ? 'opacity-50 cursor-not-allowed' 
+                      : ''
                   }`}
-                  title={!envStatus.node_version_ok ? '请先安装 Node.js' : ''}
+                  title={
+                    !envStatus.node_version_ok 
+                      ? '请先安装 Node.js' 
+                      : (envStatus.os === 'windows' && !envStatus.git_installed)
+                        ? '请先安装 Git'
+                        : ''
+                  }
                 >
                   {installing === 'openclaw' ? (
                     <>
