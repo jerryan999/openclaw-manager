@@ -28,3 +28,8 @@ npm-debug.log*
 # Tauri
 src-tauri/target/
 src-tauri/Cargo.lock
+
+# Bundled resources (large files, download via script)
+src-tauri/resources/nodejs/*.tar.gz
+src-tauri/resources/nodejs/*.zip
+src-tauri/resources/openclaw/*.tgz
