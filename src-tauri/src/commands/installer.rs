@@ -957,9 +957,16 @@ async fn uninstall_openclaw_windows() -> Result<InstallResult, String> {
     }
 }
 
+/// Unix 系统卸载 OpenClaw（Windows 下为占位，不应被调用）
+#[cfg(windows)]
+async fn uninstall_openclaw_unix() -> Result<InstallResult, String> {
+    Err("Unix uninstall is not available on Windows".to_string())
+}
+
 /// Unix 系统卸载 OpenClaw
 /// 1) 在登录 shell 中执行，保证 nvm/fnm 等环境与用户终端一致
 /// 2) 使用与 openclaw 同目录的 npm，确保从正确的全局空间卸载
+#[cfg(not(windows))]
 async fn uninstall_openclaw_unix() -> Result<InstallResult, String> {
     let npm_cmd = shell::get_openclaw_path()
         .and_then(|p| {
