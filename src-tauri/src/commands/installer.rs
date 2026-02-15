@@ -692,6 +692,120 @@ pub async fn open_install_terminal(install_type: String) -> Result<String, Strin
     }
 }
 
+/// 打开诊断终端（用于手动排查环境问题）
+#[command]
+pub async fn open_debug_terminal() -> Result<String, String> {
+    if platform::is_windows() {
+        let script = r#"
+Start-Process powershell -ArgumentList '-NoExit', '-Command', '
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "    OpenClaw 诊断终端" -ForegroundColor White
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+Write-Host "[版本检测]" -ForegroundColor Yellow
+node --version
+npm --version
+openclaw --version
+git --version
+
+Write-Host ""
+Write-Host "[路径检测]" -ForegroundColor Yellow
+where node
+where npm
+where openclaw
+where git
+
+Write-Host ""
+Write-Host "[提示] 可继续手动执行命令排查问题。" -ForegroundColor Green
+'
+"#;
+        shell::run_powershell_output(script)?;
+        Ok("已打开诊断终端".to_string())
+    } else if platform::is_macos() {
+        let script_content = r#"#!/bin/bash
+clear
+echo "========================================"
+echo "    OpenClaw 诊断终端"
+echo "========================================"
+echo ""
+echo "[版本检测]"
+node --version
+npm --version
+openclaw --version
+git --version
+echo ""
+echo "[路径检测]"
+which node
+which npm
+which openclaw
+which git
+echo ""
+echo "[提示] 可继续手动执行命令排查问题。"
+echo ""
+"#;
+
+        let script_path = "/tmp/openclaw_debug_terminal.command";
+        std::fs::write(script_path, script_content).map_err(|e| format!("创建脚本失败: {}", e))?;
+
+        std::process::Command::new("chmod")
+            .args(["+x", script_path])
+            .output()
+            .map_err(|e| format!("设置权限失败: {}", e))?;
+
+        std::process::Command::new("open")
+            .arg(script_path)
+            .spawn()
+            .map_err(|e| format!("启动终端失败: {}", e))?;
+
+        Ok("已打开诊断终端".to_string())
+    } else {
+        let script_content = r#"#!/bin/bash
+clear
+echo "========================================"
+echo "    OpenClaw 诊断终端"
+echo "========================================"
+echo ""
+echo "[版本检测]"
+node --version
+npm --version
+openclaw --version
+git --version
+echo ""
+echo "[路径检测]"
+which node
+which npm
+which openclaw
+which git
+echo ""
+echo "[提示] 可继续手动执行命令排查问题。"
+echo ""
+read -p "按回车键关闭..."
+"#;
+
+        let script_path = "/tmp/openclaw_debug_terminal.sh";
+        std::fs::write(script_path, script_content).map_err(|e| format!("创建脚本失败: {}", e))?;
+
+        std::process::Command::new("chmod")
+            .args(["+x", script_path])
+            .output()
+            .map_err(|e| format!("设置权限失败: {}", e))?;
+
+        let terminals = ["gnome-terminal", "xfce4-terminal", "konsole", "xterm"];
+        for term in terminals {
+            if std::process::Command::new(term)
+                .args(["--", script_path])
+                .spawn()
+                .is_ok()
+            {
+                return Ok("已打开诊断终端".to_string());
+            }
+        }
+
+        Err("无法启动终端，请手动在终端执行 node --version / openclaw --version".to_string())
+    }
+}
+
 /// 打开终端安装 Node.js
 async fn open_nodejs_install_terminal() -> Result<String, String> {
     if platform::is_windows() {

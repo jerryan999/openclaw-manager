@@ -12,10 +12,8 @@ use commands::{config, diagnostics, installer, process, service};
 
 fn main() {
     // 初始化日志 - 默认显示 info 级别日志
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info")
-    ).init();
-    
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     log::info!("🦞 OpenClaw Manager 启动");
 
     tauri::Builder::default()
@@ -73,6 +71,7 @@ fn main() {
             installer::install_openclaw,
             installer::init_openclaw_config,
             installer::open_install_terminal,
+            installer::open_debug_terminal,
             installer::uninstall_openclaw,
             // 版本更新
             installer::check_openclaw_update,
