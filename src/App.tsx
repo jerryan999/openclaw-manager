@@ -158,6 +158,16 @@ function App() {
     checkEnvironment(); // 重新检查环境
   }, [checkEnvironment]);
 
+  const handleOpenDebugTerminal = useCallback(async () => {
+    if (!isTauri()) return;
+    try {
+      await invoke<string>('open_debug_terminal');
+    } catch (e) {
+      appLogger.error('打开诊断终端失败', e);
+      console.error('打开诊断终端失败:', e);
+    }
+  }, []);
+
   // 页面切换处理
   const handleNavigate = (page: PageType) => {
     appLogger.action('页面切换', { from: currentPage, to: page });
@@ -295,7 +305,14 @@ function App() {
       {/* 主内容区 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 标题栏（macOS 拖拽区域） */}
-        <Header currentPage={currentPage} />
+        <Header
+          currentPage={currentPage}
+          onOpenTerminal={
+            currentPage === 'dashboard' && envStatus && !envStatus.ready
+              ? handleOpenDebugTerminal
+              : undefined
+          }
+        />
         
         {/* 页面内容 */}
         <main className="flex-1 overflow-hidden p-6">

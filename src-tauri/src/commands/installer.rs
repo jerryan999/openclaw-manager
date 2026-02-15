@@ -522,6 +522,14 @@ async fn install_openclaw_windows() -> Result<InstallResult, String> {
             }
         };
 
+        if runtime.openclaw_cmd.exists() {
+            return Ok(InstallResult {
+                success: true,
+                message: "OpenClaw 离线运行时已就绪。".to_string(),
+                error: None,
+            });
+        }
+
         let npm_cmd = runtime.node_dir.join("npm.cmd");
         if !npm_cmd.exists() {
             return Ok(InstallResult {

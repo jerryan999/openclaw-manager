@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { PageType } from '../../App';
-import { RefreshCw, ExternalLink, Loader2 } from 'lucide-react';
+import { RefreshCw, ExternalLink, Loader2, Terminal } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-shell';
 import { invoke } from '@tauri-apps/api/core';
 
 interface HeaderProps {
   currentPage: PageType;
+  /** 在刷新按钮左侧显示终端按钮（用于环境配置时打开诊断终端） */
+  onOpenTerminal?: () => Promise<void>;
 }
 
 const pageTitles: Record<PageType, { title: string; description: string }> = {
@@ -17,7 +19,7 @@ const pageTitles: Record<PageType, { title: string; description: string }> = {
   settings: { title: '设置', description: '身份配置与高级选项' },
 };
 
-export function Header({ currentPage }: HeaderProps) {
+export function Header({ currentPage, onOpenTerminal }: HeaderProps) {
   const { title, description } = pageTitles[currentPage];
   const [opening, setOpening] = useState(false);
 
@@ -46,6 +48,15 @@ export function Header({ currentPage }: HeaderProps) {
 
       {/* 右侧：操作按钮 */}
       <div className="flex items-center gap-2 titlebar-no-drag">
+        {onOpenTerminal && (
+          <button
+            onClick={onOpenTerminal}
+            className="icon-button text-gray-500 hover:text-gray-300"
+            title="终端"
+          >
+            <Terminal size={16} />
+          </button>
+        )}
         <button
           onClick={() => window.location.reload()}
           className="icon-button text-gray-400 hover:text-white"

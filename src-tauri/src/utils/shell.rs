@@ -157,6 +157,17 @@ fn find_windows_resource_file(relative: &str) -> Option<PathBuf> {
 }
 
 #[cfg(windows)]
+fn find_windows_resource_dir(relative: &str) -> Option<PathBuf> {
+    for root in get_windows_resource_roots() {
+        let path = root.join(relative);
+        if path.is_dir() {
+            return Some(path);
+        }
+    }
+    None
+}
+
+#[cfg(windows)]
 fn extract_zip(zip_path: &Path, output_dir: &Path) -> io::Result<()> {
     fs::create_dir_all(output_dir)?;
     let file = fs::File::open(zip_path)?;
@@ -303,6 +314,27 @@ fn ensure_windows_openclaw_package(runtime_root: &Path) -> io::Result<PathBuf> {
 }
 
 #[cfg(windows)]
+fn ensure_windows_preinstalled_npm_prefix(runtime_root: &Path) -> io::Result<PathBuf> {
+    let npm_prefix = runtime_root.join("npm-global");
+    if npm_prefix.join("openclaw.cmd").exists() {
+        return Ok(npm_prefix);
+    }
+
+    let Some(preinstalled_dir) = find_windows_resource_dir("offline\\npm-global") else {
+        fs::create_dir_all(&npm_prefix)?;
+        return Ok(npm_prefix);
+    };
+
+    let tmp_dir = runtime_root.join("tmp-npm-global");
+    if tmp_dir.exists() {
+        fs::remove_dir_all(&tmp_dir)?;
+    }
+    copy_dir_recursive(&preinstalled_dir, &tmp_dir)?;
+    move_or_copy_dir(&tmp_dir, &npm_prefix)?;
+    Ok(npm_prefix)
+}
+
+#[cfg(windows)]
 fn find_git_resource_zip() -> Option<PathBuf> {
     for rel in GIT_RESOURCE_CANDIDATES {
         if let Some(path) = find_windows_resource_file(rel) {
@@ -355,8 +387,8 @@ pub fn get_windows_offline_runtime() -> Result<WindowsOfflineRuntime, String> {
     let openclaw_package = ensure_windows_openclaw_package(&runtime_root)
         .map_err(|e| format!("准备离线 OpenClaw 包失败: {}", e))?;
 
-    let npm_prefix = runtime_root.join("npm-global");
-    fs::create_dir_all(&npm_prefix).map_err(|e| format!("创建 npm 全局目录失败: {}", e))?;
+    let npm_prefix = ensure_windows_preinstalled_npm_prefix(&runtime_root)
+        .map_err(|e| format!("准备预装 OpenClaw 运行时失败: {}", e))?;
 
     let git_exe = ensure_windows_git_runtime(&runtime_root)
         .map_err(|e| format!("准备离线 Git 失败: {}", e))?;
