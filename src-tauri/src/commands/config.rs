@@ -3,7 +3,7 @@ use crate::models::{
     ModelConfig, OfficialProvider, SuggestedModel,
 };
 use crate::utils::{file, platform, shell};
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

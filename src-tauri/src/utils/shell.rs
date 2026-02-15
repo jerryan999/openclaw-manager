@@ -236,6 +236,12 @@ pub fn run_login_shell_output(script: &str) -> Result<String, String> {
     }
 }
 
+/// 在登录 shell 中执行脚本（Windows 占位函数）
+#[cfg(windows)]
+pub fn run_login_shell_output(_script: &str) -> Result<String, String> {
+    Err("Login shell execution is not available on Windows".to_string())
+}
+
 /// 跨平台执行脚本命令
 /// Windows 上使用 cmd.exe（避免 PowerShell 执行策略问题）
 pub fn run_script_output(script: &str) -> Result<String, String> {
