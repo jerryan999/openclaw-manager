@@ -40,6 +40,20 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Download bundled resources (macOS/Linux)
+        if: matrix.name == 'macos'
+        run: |
+          cd src-tauri/resources
+          chmod +x download-resources.sh
+          ./download-resources.sh
+
+      - name: Download bundled resources (Windows)
+        if: matrix.name == 'windows'
+        run: |
+          cd src-tauri/resources
+          ./download-resources.ps1
+        shell: pwsh
+
       - name: Build Tauri app
         run: npm run tauri build
 
