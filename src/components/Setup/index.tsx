@@ -205,20 +205,26 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                 </div>
                 <div>
                   <p className="text-white font-medium">
-                    Node.js {envStatus.has_bundled_nodejs && !envStatus.node_installed && '(已内置)'}
+                    Node.js {envStatus.has_bundled_nodejs && '✨'}
                   </p>
                   <p className="text-sm text-dark-400">
                     {envStatus.node_version 
                       ? `${envStatus.node_version} ${envStatus.node_version_ok ? '✓' : '(需要 v22+)'}` 
                       : envStatus.has_bundled_nodejs
-                        ? '已内置 v22+ (无需安装)'
+                        ? '✨ 已内置 v22.12 (开箱即用)'
                         : '未安装'}
                   </p>
                 </div>
               </div>
               
               {(envStatus.node_installed && envStatus.node_version_ok) || envStatus.has_bundled_nodejs ? (
-                <CheckCircle2 className="w-6 h-6 text-green-400" />
+                envStatus.has_bundled_nodejs && !envStatus.node_installed ? (
+                  <span className="text-xs text-green-400 px-3 py-1 bg-green-500/10 rounded-lg border border-green-500/30">
+                    已内置
+                  </span>
+                ) : (
+                  <CheckCircle2 className="w-6 h-6 text-green-400" />
+                )
               ) : (
                 <button
                   onClick={handleInstallNodejs}

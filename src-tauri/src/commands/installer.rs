@@ -599,7 +599,7 @@ node --version
 
 /// 安装 OpenClaw
 #[command]
-pub async fn install_openclaw() -> Result<InstallResult, String> {
+pub async fn install_openclaw(app: tauri::AppHandle) -> Result<InstallResult, String> {
     info!("[安装OpenClaw] 开始安装 OpenClaw...");
     let os = platform::get_os();
     info!("[安装OpenClaw] 检测到操作系统: {}", os);
@@ -607,11 +607,11 @@ pub async fn install_openclaw() -> Result<InstallResult, String> {
     let result = match os.as_str() {
         "windows" => {
             info!("[安装OpenClaw] 使用 Windows 安装方式...");
-            install_openclaw_windows().await
+            install_openclaw_windows(&app).await
         },
         _ => {
             info!("[安装OpenClaw] 使用 Unix 安装方式 (npm)...");
-            install_openclaw_unix().await
+            install_openclaw_unix(&app).await
         },
     };
     
@@ -624,19 +624,39 @@ pub async fn install_openclaw() -> Result<InstallResult, String> {
     result
 }
 
-/// 检查是否有打包的离线 OpenClaw 包
-fn get_bundled_openclaw_package() -> Option<String> {
-    // 尝试在资源目录中查找 openclaw-zh.tgz
-    let resource_paths = vec![
-        "resources/openclaw/openclaw-zh.tgz",
-        "../resources/openclaw/openclaw-zh.tgz",
-        "openclaw-zh.tgz",
+/// 检查是否有打包的离线 OpenClaw 包（使用 AppHandle 获取资源路径）
+fn get_bundled_openclaw_package_with_app(app: &tauri::AppHandle) -> Option<String> {
+    // 优先使用 Tauri 的资源目录
+    if let Some(path) = bundled::get_bundled_openclaw_package(app) {
+        let path_str = path.display().to_string();
+        info!("[安装OpenClaw] 通过 AppHandle 找到离线包: {}", path_str);
+        return Some(path_str);
+    }
+    
+    // 回退：在本地目录中查找（用于开发模式）
+    let resource_dirs = vec![
+        "resources/openclaw",
+        "../resources/openclaw",
+        "src-tauri/resources/openclaw",
+        "openclaw",
     ];
     
-    for path in resource_paths {
-        if std::path::Path::new(path).exists() {
-            info!("[安装OpenClaw] 找到离线包: {}", path);
-            return Some(path.to_string());
+    for dir in resource_dirs {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let filename = path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("");
+                
+                // 匹配 openclaw-zh.tgz 或 jerryan999-openclaw-zh-*.tgz
+                if filename == "openclaw-zh.tgz" || 
+                   (filename.starts_with("jerryan999-openclaw-zh") && filename.ends_with(".tgz")) {
+                    let path_str = path.display().to_string();
+                    info!("[安装OpenClaw] 找到本地离线包: {}", path_str);
+                    return Some(path_str);
+                }
+            }
         }
     }
     
@@ -645,9 +665,9 @@ fn get_bundled_openclaw_package() -> Option<String> {
 }
 
 /// Windows 安装 OpenClaw
-async fn install_openclaw_windows() -> Result<InstallResult, String> {
+async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResult, String> {
     // 检查是否有打包的离线包
-    let bundled_package = get_bundled_openclaw_package();
+    let bundled_package = get_bundled_openclaw_package_with_app(app);
     
     // 如果没有离线包，则需要 Git
     if bundled_package.is_none() && get_git_version().is_none() {
@@ -767,9 +787,9 @@ if ($openclawVersion) {
 }
 
 /// Unix 系统安装 OpenClaw
-async fn install_openclaw_unix() -> Result<InstallResult, String> {
+async fn install_openclaw_unix(app: &tauri::AppHandle) -> Result<InstallResult, String> {
     // 检查是否有打包的离线包
-    let bundled_package = get_bundled_openclaw_package();
+    let bundled_package = get_bundled_openclaw_package_with_app(app);
     
     let script = if let Some(package_path) = bundled_package {
         info!("[安装OpenClaw] 使用离线包: {}", package_path);
