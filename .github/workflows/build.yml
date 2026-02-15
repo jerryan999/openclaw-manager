@@ -95,5 +95,9 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            openclaw-manager-macos/**/*
-            openclaw-manager-windows/**/*
+            openclaw-manager-macos/**/*.dmg
+            openclaw-manager-macos/openclaw/node-macos-arm64.tar.gz
+            openclaw-manager-macos/openclaw/openclaw-zh.tgz
+            openclaw-manager-windows/**/*.exe
+            openclaw-manager-windows/**/*.msi
+            openclaw-manager-windows/nodejs/node-windows-x64.zip
