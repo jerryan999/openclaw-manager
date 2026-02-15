@@ -9,11 +9,23 @@ use tauri::Manager;
 pub fn get_resource_path(app_handle: &tauri::AppHandle, resource_name: &str) -> Option<PathBuf> {
     // 尝试从打包资源中获取
     if let Ok(resource_path) = app_handle.path().resource_dir() {
+        info!("[资源] 资源根目录: {:?}", resource_path);
         let full_path = resource_path.join(resource_name);
+        info!("[资源] 检查路径: {:?}, exists={}", full_path, full_path.exists());
         if full_path.exists() {
-            info!("[资源] 找到打包资源: {:?}", full_path);
+            info!("[资源] ✓ 找到打包资源: {:?}", full_path);
             return Some(full_path);
         }
+        
+        // 列出资源目录的内容，帮助调试
+        if let Ok(entries) = std::fs::read_dir(&resource_path) {
+            info!("[资源] 资源目录内容:");
+            for entry in entries.flatten() {
+                info!("[资源]   - {:?}", entry.file_name());
+            }
+        }
+    } else {
+        warn!("[资源] 无法获取资源目录");
     }
     
     // 开发模式：从 src-tauri/resources/ 读取
@@ -25,7 +37,7 @@ pub fn get_resource_path(app_handle: &tauri::AppHandle, resource_name: &str) -> 
         }
     }
     
-    warn!("[资源] 未找到资源: {}", resource_name);
+    warn!("[资源] ✗ 未找到资源: {}", resource_name);
     None
 }
 
