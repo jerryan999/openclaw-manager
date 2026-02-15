@@ -1,94 +1,283 @@
-.PHONY: help dev build release tag push bump-version clean install check
+# OpenClaw Manager - Makefile
+# Build fully offline Tauri application
+# Supports: macOS & Windows
 
-# 版本号变量 - 修改这里来更新版本
-TAG := 0.0.18
+.PHONY: help build dev clean check resources install test release
 
-help: ## 显示帮助信息
-	@echo "OpenClaw Manager - 常用命令"
-	@echo ""
-	@echo "使用方法: make [命令]"
-	@echo ""
-	@echo "可用命令:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
-	@echo ""
-	@echo "当前版本: $(TAG)"
+.DEFAULT_GOAL := help
 
-install: ## 安装依赖
-	@echo "📦 安装依赖..."
+# Detect OS
+ifeq ($(OS),Windows_NT)
+	DETECTED_OS := Windows
+	CARGO_BIN := $(USERPROFILE)\.cargo\bin
+	RESOURCES_DIR := src-tauri\resources
+	PATH_SEP := ;
+	RM := del /q
+	RMDIR := rmdir /s /q
+	MKDIR := mkdir
+	OPEN := explorer
+	NULL := 2>nul
+else
+	DETECTED_OS := $(shell uname -s)
+	CARGO_BIN := $(HOME)/.cargo/bin
+	RESOURCES_DIR := src-tauri/resources
+	PATH_SEP := :
+	RM := rm -f
+	RMDIR := rm -rf
+	MKDIR := mkdir -p
+	NULL := 2>/dev/null
+	ifeq ($(DETECTED_OS),Darwin)
+		DETECTED_OS := macOS
+		OPEN := open
+	else
+		OPEN := xdg-open
+	endif
+endif
+
+help: ## Show help
+	@echo ""
+	@echo "OpenClaw Manager Build Tool"
+	@echo "Platform: $(DETECTED_OS)"
+	@echo ""
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Targets:"
+	@echo "  check       Check build environment"
+	@echo "  resources   Download bundled resources"
+	@echo "  install     Install dependencies"
+	@echo "  dev         Run in development mode"
+	@echo "  build       Build offline version"
+	@echo "  release     Build and prepare release"
+	@echo "  clean       Clean build artifacts"
+	@echo "  info        Show project info"
+	@echo ""
+
+check: ## Check environment
+	@echo ""
+	@echo "Checking build environment ($(DETECTED_OS))..."
+	@echo ""
+	@node --version $(NULL) && echo "Node.js: OK" || echo "Node.js: MISSING"
+	@npm --version $(NULL) && echo "npm: OK" || echo "npm: MISSING"
+	@rustc --version $(NULL) && echo "Rust: OK" || echo "Rust: MISSING"
+	@cargo --version $(NULL) && echo "Cargo: OK" || echo "Cargo: MISSING"
+	@echo ""
+ifeq ($(DETECTED_OS),Windows)
+	@if exist "$(RESOURCES_DIR)\nodejs\node-windows-x64.zip" (echo Node.js resource: OK) else (echo Node.js resource: MISSING)
+	@if exist "$(RESOURCES_DIR)\openclaw\openclaw-zh.tgz" (echo OpenClaw resource: OK) else (echo OpenClaw resource: MISSING)
+else ifeq ($(DETECTED_OS),macOS)
+	@test -f "$(RESOURCES_DIR)/nodejs/node-macos-arm64.tar.gz" && echo "Node.js ARM64 resource: OK" || echo "Node.js ARM64 resource: MISSING"
+	@test -f "$(RESOURCES_DIR)/nodejs/node-macos-x64.tar.gz" && echo "Node.js x64 resource: OK" || echo "Node.js x64 resource: MISSING"
+	@test -f "$(RESOURCES_DIR)/openclaw/openclaw-zh.tgz" && echo "OpenClaw resource: OK" || echo "OpenClaw resource: MISSING"
+else
+	@test -f "$(RESOURCES_DIR)/nodejs/node-linux-x64.tar.gz" && echo "Node.js resource: OK" || echo "Node.js resource: MISSING"
+	@test -f "$(RESOURCES_DIR)/openclaw/openclaw-zh.tgz" && echo "OpenClaw resource: OK" || echo "OpenClaw resource: MISSING"
+endif
+	@echo ""
+
+resources: ## Download resources
+	@echo ""
+	@echo "Downloading resources for $(DETECTED_OS)..."
+	@echo ""
+ifeq ($(DETECTED_OS),Windows)
+	@cd $(RESOURCES_DIR) && powershell -ExecutionPolicy Bypass -File .\download-resources.ps1
+else
+	@cd $(RESOURCES_DIR) && bash ./download-resources.sh
+endif
+
+install: ## Install dependencies
+	@echo ""
+	@echo "Installing dependencies..."
+	@echo ""
 	npm install
 
-dev: ## 启动开发服务器
-	@echo "🚀 启动开发服务器..."
-	npm run tauri dev
+dev: ## Run development mode
+	@echo ""
+	@echo "Starting development mode..."
+	@echo ""
+ifeq ($(DETECTED_OS),Windows)
+	@set PATH=$(CARGO_BIN);%PATH% && npm run tauri:dev
+else
+	@export PATH="$(CARGO_BIN):$$PATH" && npm run tauri:dev
+endif
 
-build: ## 构建应用
-	@echo "🔨 构建应用..."
-	npm run tauri build
+build: ## Build application
+	@echo ""
+	@echo "Building offline version for $(DETECTED_OS)..."
+	@echo "This may take 6-8 minutes on first build"
+	@echo ""
+ifeq ($(DETECTED_OS),Windows)
+	@set PATH=$(CARGO_BIN);%PATH% && npm run tauri:build
+	@echo ""
+	@echo "Build complete!"
+	@echo ""
+	@if exist "src-tauri\target\release\bundle\msi\*.msi" (echo Output: src-tauri\target\release\bundle\msi\) else (echo No MSI found)
+else ifeq ($(DETECTED_OS),macOS)
+	@export PATH="$(CARGO_BIN):$$PATH" && npm run tauri:build
+	@echo ""
+	@echo "Build complete!"
+	@echo ""
+	@test -d "src-tauri/target/release/bundle/dmg" && echo "Output: src-tauri/target/release/bundle/dmg/" || echo "No DMG found"
+	@test -d "src-tauri/target/release/bundle/macos" && echo "Output: src-tauri/target/release/bundle/macos/" || echo "No .app found"
+else
+	@export PATH="$(CARGO_BIN):$$PATH" && npm run tauri:build
+	@echo ""
+	@echo "Build complete!"
+	@echo ""
+	@test -d "src-tauri/target/release/bundle/appimage" && echo "Output: src-tauri/target/release/bundle/appimage/" || echo "No AppImage found"
+	@test -d "src-tauri/target/release/bundle/deb" && echo "Output: src-tauri/target/release/bundle/deb/" || echo "No DEB found"
+endif
+	@echo ""
 
-check: ## 检查 Rust 代码
-	@echo "🔍 检查 Rust 代码..."
-	cd src-tauri && cargo check
+build-frontend: ## Build frontend only
+	@echo "Building frontend..."
+	npm run build
 
-fmt: ## 格式化 Rust 代码
-	@echo "✨ 格式化 Rust 代码..."
-	cd src-tauri && cargo fmt
+build-backend: ## Build backend only (debug)
+	@echo "Building Rust backend (debug)..."
+ifeq ($(DETECTED_OS),Windows)
+	@set PATH=$(CARGO_BIN);%PATH% && cd src-tauri && cargo build
+else
+	@export PATH="$(CARGO_BIN):$$PATH" && cd src-tauri && cargo build
+endif
 
-lint: ## Lint 前端代码
-	@echo "🔍 Lint 前端代码..."
-	npm run lint
+build-backend-release: ## Build backend only (release)
+	@echo "Building Rust backend (release)..."
+ifeq ($(DETECTED_OS),Windows)
+	@set PATH=$(CARGO_BIN);%PATH% && cd src-tauri && cargo build --release
+else
+	@export PATH="$(CARGO_BIN):$$PATH" && cd src-tauri && cargo build --release
+endif
 
-bump-version: ## 更新版本号到 TAG 变量指定的版本
-	@echo "📝 更新版本号到 $(TAG)..."
-	@sed -i '' 's/"version": "[0-9]*\.[0-9]*\.[0-9]*"/"version": "$(TAG)"/g' package.json
-	@sed -i '' 's/version = "[0-9]*\.[0-9]*\.[0-9]*"/version = "$(TAG)"/g' src-tauri/Cargo.toml
-	@sed -i '' 's/"version": "[0-9]*\.[0-9]*\.[0-9]*"/"version": "$(TAG)"/g' src-tauri/tauri.conf.json
-	@echo "✅ 版本号已更新到 $(TAG)"
+test: ## Run tests
+	@echo "Running tests..."
+	npm run test
+ifeq ($(DETECTED_OS),Windows)
+	@set PATH=$(CARGO_BIN);%PATH% && cd src-tauri && cargo test
+else
+	@export PATH="$(CARGO_BIN):$$PATH" && cd src-tauri && cargo test
+endif
 
-tag: bump-version ## 创建 git tag（会先更新版本号）
-	@echo "🏷️  创建 tag v$(TAG)..."
-	git add -A
-	git commit -m "chore: bump version to $(TAG)" || true
-	git tag -a v$(TAG) -m "Release v$(TAG)"
-	@echo "✅ Tag v$(TAG) 已创建"
+clean: ## Clean build artifacts
+	@echo "Cleaning build artifacts..."
+ifeq ($(DETECTED_OS),Windows)
+	@if exist "dist" $(RMDIR) "dist"
+	@if exist "src-tauri\target" $(RMDIR) "src-tauri\target"
+	@if exist "node_modules\.cache" $(RMDIR) "node_modules\.cache"
+else
+	@$(RMDIR) dist $(NULL) || true
+	@$(RMDIR) src-tauri/target $(NULL) || true
+	@$(RMDIR) node_modules/.cache $(NULL) || true
+endif
+	@echo "Clean complete!"
 
-push: ## 推送代码和 tag 到远程仓库
-	@echo "🚀 推送到远程仓库..."
-	git push origin main
-	git push origin v$(TAG)
-	@echo "✅ 已推送到远程仓库"
+clean-resources: ## Clean downloaded resources
+	@echo "Cleaning resources..."
+ifeq ($(DETECTED_OS),Windows)
+	@if exist "$(RESOURCES_DIR)\nodejs\*.zip" $(RM) "$(RESOURCES_DIR)\nodejs\*.zip"
+	@if exist "$(RESOURCES_DIR)\nodejs\*.tar.gz" $(RM) "$(RESOURCES_DIR)\nodejs\*.tar.gz"
+	@if exist "$(RESOURCES_DIR)\openclaw\*.tgz" $(RM) "$(RESOURCES_DIR)\openclaw\*.tgz"
+else
+	@$(RM) $(RESOURCES_DIR)/nodejs/*.zip $(NULL) || true
+	@$(RM) $(RESOURCES_DIR)/nodejs/*.tar.gz $(NULL) || true
+	@$(RM) $(RESOURCES_DIR)/openclaw/*.tgz $(NULL) || true
+endif
+	@echo "Resources cleaned!"
 
-release: tag push ## 完整发布流程：更新版本 -> 创建 tag -> 推送
-	@echo "🎉 发布 v$(TAG) 完成！"
-	@echo "查看构建状态: https://github.com/jerryan999/openclaw-manager/actions"
+clean-all: clean clean-resources ## Clean everything
+	@echo "Cleaning all..."
+ifeq ($(DETECTED_OS),Windows)
+	@if exist "node_modules" $(RMDIR) "node_modules"
+else
+	@$(RMDIR) node_modules $(NULL) || true
+endif
+	@echo "All cleaned!"
 
-rollback-tag: ## 删除本地和远程的当前 TAG
-	@echo "⚠️  删除 tag v$(TAG)..."
-	git tag -d v$(TAG) || true
-	git push origin :refs/tags/v$(TAG) || true
-	@echo "✅ Tag v$(TAG) 已删除"
+info: ## Show project info
+	@echo ""
+	@echo "Project: OpenClaw Manager"
+	@echo "Version: 0.0.18"
+	@echo "Platform: $(DETECTED_OS)"
+	@echo ""
+	@echo "Resource Status:"
+ifeq ($(DETECTED_OS),Windows)
+	@if exist "$(RESOURCES_DIR)\nodejs\node-windows-x64.zip" (echo   Node.js Windows: Downloaded) else (echo   Node.js Windows: Not downloaded)
+	@if exist "$(RESOURCES_DIR)\openclaw\openclaw-zh.tgz" (echo   OpenClaw: Downloaded) else (echo   OpenClaw: Not downloaded)
+else ifeq ($(DETECTED_OS),macOS)
+	@test -f "$(RESOURCES_DIR)/nodejs/node-macos-arm64.tar.gz" && echo "  Node.js ARM64: Downloaded" || echo "  Node.js ARM64: Not downloaded"
+	@test -f "$(RESOURCES_DIR)/nodejs/node-macos-x64.tar.gz" && echo "  Node.js x64: Downloaded" || echo "  Node.js x64: Not downloaded"
+	@test -f "$(RESOURCES_DIR)/openclaw/openclaw-zh.tgz" && echo "  OpenClaw: Downloaded" || echo "  OpenClaw: Not downloaded"
+else
+	@test -f "$(RESOURCES_DIR)/nodejs/node-linux-x64.tar.gz" && echo "  Node.js: Downloaded" || echo "  Node.js: Not downloaded"
+	@test -f "$(RESOURCES_DIR)/openclaw/openclaw-zh.tgz" && echo "  OpenClaw: Downloaded" || echo "  OpenClaw: Not downloaded"
+endif
+	@echo ""
 
-list-tags: ## 列出所有 tags
-	@echo "📋 现有 tags:"
-	@git tag -l
+size: ## Show bundle sizes
+	@echo ""
+	@echo "Build Artifacts:"
+ifeq ($(DETECTED_OS),Windows)
+	@if exist "src-tauri\target\release\bundle\msi" (dir "src-tauri\target\release\bundle\msi\*.msi" /s) else (echo No MSI found)
+	@if exist "src-tauri\target\release\openclaw-manager.exe" (dir "src-tauri\target\release\openclaw-manager.exe") else (echo No EXE found)
+else ifeq ($(DETECTED_OS),macOS)
+	@test -d "src-tauri/target/release/bundle/dmg" && ls -lh src-tauri/target/release/bundle/dmg/*.dmg || echo "No DMG found"
+	@test -d "src-tauri/target/release/bundle/macos" && du -sh src-tauri/target/release/bundle/macos/*.app || echo "No .app found"
+else
+	@test -d "src-tauri/target/release/bundle/appimage" && ls -lh src-tauri/target/release/bundle/appimage/*.AppImage || echo "No AppImage found"
+	@test -d "src-tauri/target/release/bundle/deb" && ls -lh src-tauri/target/release/bundle/deb/*.deb || echo "No DEB found"
+endif
+	@echo ""
 
-status: ## 查看 git 状态
-	@git status
+open-bundle: ## Open bundle directory
+ifeq ($(DETECTED_OS),Windows)
+	@if exist "src-tauri\target\release\bundle" ($(OPEN) "src-tauri\target\release\bundle") else (echo Bundle directory not found)
+else
+	@test -d "src-tauri/target/release/bundle" && $(OPEN) "src-tauri/target/release/bundle" || echo "Bundle directory not found"
+endif
 
-clean: ## 清理构建产物
-	@echo "🧹 清理构建产物..."
-	rm -rf dist
-	rm -rf src-tauri/target
-	rm -rf node_modules
-	@echo "✅ 清理完成"
+release: build ## Build and prepare release
+	@echo ""
+	@echo "Release package ready!"
+	@echo ""
+	@echo "Next steps:"
+ifeq ($(DETECTED_OS),Windows)
+	@echo "  1. Test the MSI installer"
+else ifeq ($(DETECTED_OS),macOS)
+	@echo "  1. Test the DMG installer"
+else
+	@echo "  1. Test the package"
+endif
+	@echo "  2. Create GitHub Release"
+	@echo "  3. Upload the installer"
+	@echo "  4. Write release notes"
+	@echo ""
 
-update-deps: ## 更新依赖
-	@echo "📦 更新前端依赖..."
-	npm update
-	@echo "📦 更新 Rust 依赖..."
-	cd src-tauri && cargo update
+quickstart: install resources build ## Quick start: install + resources + build
+	@echo ""
+	@echo "Quickstart complete!"
+ifeq ($(DETECTED_OS),Windows)
+	@echo "Next: Run 'make dev' or test the MSI installer"
+else ifeq ($(DETECTED_OS),macOS)
+	@echo "Next: Run 'make dev' or test the DMG installer"
+else
+	@echo "Next: Run 'make dev' or test the package"
+endif
+	@echo ""
 
-# 快速发布命令（指定版本）
-# 使用方法: make quick-release TAG=0.0.11
-quick-release: ## 快速发布：更新版本 -> 提交 -> 创建 tag -> 推送
-	@echo "🚀 快速发布 v$(TAG)..."
-	@$(MAKE) release TAG=$(TAG)
+# Manual build command for reference
+manual-build: ## Show manual build command
+	@echo ""
+	@echo "Manual build command for $(DETECTED_OS):"
+ifeq ($(DETECTED_OS),Windows)
+	@echo "  set PATH=$(CARGO_BIN);%%PATH%% && npm run tauri:build"
+	@echo ""
+	@echo "With environment setup:"
+	@echo "  set PATH=$(CARGO_BIN);%%PATH%%"
+	@echo "  npm run tauri:build"
+else
+	@echo "  export PATH=\"$(CARGO_BIN):$$PATH\" && npm run tauri:build"
+	@echo ""
+	@echo "With environment setup:"
+	@echo "  export PATH=\"$(CARGO_BIN):$$PATH\""
+	@echo "  npm run tauri:build"
+endif
+	@echo ""
