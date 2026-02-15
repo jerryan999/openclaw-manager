@@ -62,9 +62,9 @@ cd openclaw
 if command -v npm &> /dev/null; then
   echo "  使用 npm pack 打包..."
   rm -f *.tgz
-  # 强制从 registry 获取最新版本信息
-  npm view "$OPENCLAW_PACKAGE@latest" version > /dev/null
-  npm pack "$OPENCLAW_PACKAGE" --prefer-online
+  # 强制清除缓存并从 registry 获取最新版本
+  npm cache clean --force 2>/dev/null || true
+  npm pack "$OPENCLAW_PACKAGE@latest" --prefer-online
   
   # 重命名为统一的文件名
   for file in jerryan999-openclaw-zh-*.tgz; do
