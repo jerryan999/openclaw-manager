@@ -54,6 +54,39 @@ jobs:
           ./download-resources.ps1
         shell: pwsh
 
+      - name: Prepare portable Git resource (Windows)
+        if: matrix.name == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/resources/git | Out-Null
+          $gitExe = (Get-Command git).Source
+          $gitRoot = Split-Path (Split-Path $gitExe -Parent) -Parent
+          Compress-Archive -Path "$gitRoot\*" -DestinationPath "src-tauri/resources/git/git-portable.zip" -Force
+
+      - name: Prepare offline OpenClaw runtime (Windows)
+        if: matrix.name == 'windows'
+        shell: pwsh
+        run: |
+          $extractDir = "src-tauri/resources/offline/node-extract"
+          if (Test-Path $extractDir) { Remove-Item -Recurse -Force $extractDir }
+          Expand-Archive -Path "src-tauri/resources/nodejs/node-windows-x64.zip" -DestinationPath $extractDir -Force
+
+          $nodeExe = Get-ChildItem -Path $extractDir -Filter node.exe -Recurse | Select-Object -First 1
+          if (-not $nodeExe) { throw "node.exe not found in bundled node zip" }
+          $nodeDir = Split-Path $nodeExe.FullName -Parent
+          $npmCmd = Join-Path $nodeDir "npm.cmd"
+          if (-not (Test-Path $npmCmd)) { throw "npm.cmd not found near node.exe" }
+
+          $offlinePrefix = "src-tauri/resources/offline/npm-global"
+          if (Test-Path $offlinePrefix) { Remove-Item -Recurse -Force $offlinePrefix }
+          New-Item -ItemType Directory -Force -Path $offlinePrefix | Out-Null
+
+          & $npmCmd install -g "src-tauri/resources/openclaw/openclaw-zh.tgz" --prefix $offlinePrefix --no-audit --fund=false --loglevel=error
+          if ($LASTEXITCODE -ne 0) { throw "offline openclaw install failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path "$offlinePrefix/openclaw.cmd")) { throw "openclaw.cmd not found after preinstall" }
+
+          Remove-Item -Recurse -Force $extractDir
+
       - name: Build Tauri app
         run: npm run tauri build
 
