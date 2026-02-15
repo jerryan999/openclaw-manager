@@ -1,4 +1,4 @@
-use crate::utils::{platform, shell};
+use crate::utils::{platform, shell, bundled};
 use serde::{Deserialize, Serialize};
 use tauri::command;
 use log::{info, warn, error, debug};
@@ -12,6 +12,8 @@ pub struct EnvironmentStatus {
     pub node_version: Option<String>,
     /// Node.js 版本是否满足要求 (>=22)
     pub node_version_ok: bool,
+    /// 是否有打包的 Node.js
+    pub has_bundled_nodejs: bool,
     /// Git 是否安装
     pub git_installed: bool,
     /// Git 版本
@@ -49,7 +51,7 @@ pub struct InstallResult {
 
 /// 检查环境状态
 #[command]
-pub async fn check_environment() -> Result<EnvironmentStatus, String> {
+pub async fn check_environment(app: tauri::AppHandle) -> Result<EnvironmentStatus, String> {
     info!("[环境检查] 开始检查系统环境...");
     
     let os = platform::get_os();
@@ -62,6 +64,10 @@ pub async fn check_environment() -> Result<EnvironmentStatus, String> {
     let node_version_ok = check_node_version_requirement(&node_version);
     info!("[环境检查] Node.js: installed={}, version={:?}, version_ok={}", 
         node_installed, node_version, node_version_ok);
+    
+    // 检查打包的 Node.js
+    let has_bundled_nodejs = bundled::has_bundled_nodejs(&app);
+    info!("[环境检查] 打包的 Node.js: {}", if has_bundled_nodejs { "存在" } else { "不存在" });
     
     // 检查 Git
     info!("[环境检查] 检查 Git...");
@@ -83,17 +89,22 @@ pub async fn check_environment() -> Result<EnvironmentStatus, String> {
     info!("[环境检查] 配置目录: {}, exists={}", config_dir, config_dir_exists);
     
     // 检查是否有离线安装包
-    let has_offline_package = get_bundled_openclaw_package().is_some();
+    let has_offline_package = bundled::get_bundled_openclaw_package(&app).is_some();
     info!("[环境检查] 离线安装包: {}", if has_offline_package { "存在" } else { "不存在" });
     
     // 环境就绪判断：
-    // 1. 如果有离线包：只需要 Node.js（无论什么系统）
-    // 2. 如果没有离线包：Windows 需要 Git，Unix 不需要
+    // 1. OpenClaw 已安装 → 就绪
+    // 2. 有打包的 Node.js 和离线包 → 就绪（完全离线，无需任何依赖）
+    // 3. 有离线包 + 已安装 Node.js → 就绪
+    // 4. 无离线包：需要 Node.js + (Windows需要Git)
     let ready = if openclaw_installed {
         // OpenClaw 已安装，就绪
         true
+    } else if has_bundled_nodejs && has_offline_package {
+        // 完全离线模式：有打包的 Node.js 和 OpenClaw
+        true
     } else if has_offline_package {
-        // 有离线包，只需要 Node.js
+        // 有离线包，只需要 Node.js（系统已安装或打包）
         node_installed && node_version_ok
     } else if platform::is_windows() {
         // Windows 在线安装需要 Node.js + Git
@@ -102,13 +113,14 @@ pub async fn check_environment() -> Result<EnvironmentStatus, String> {
         // Unix 在线安装只需要 Node.js
         node_installed && node_version_ok
     };
-    info!("[环境检查] 环境就绪状态: ready={}, 离线包={}, Windows={}", 
-        ready, has_offline_package, platform::is_windows());
+    info!("[环境检查] 环境就绪状态: ready={}, 打包Node={}, 离线包={}, Windows={}", 
+        ready, has_bundled_nodejs, has_offline_package, platform::is_windows());
     
     Ok(EnvironmentStatus {
         node_installed,
         node_version,
         node_version_ok,
+        has_bundled_nodejs,
         git_installed,
         git_version,
         has_offline_package,
