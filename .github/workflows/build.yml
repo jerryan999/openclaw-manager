@@ -87,8 +87,13 @@ jobs:
 
           Remove-Item -Recurse -Force $extractDir
 
-      - name: Build Tauri app
+      - name: Build Tauri app (macOS)
+        if: matrix.name == 'macos'
         run: npm run tauri build
+
+      - name: Build Tauri app (Windows, NSIS only)
+        if: matrix.name == 'windows'
+        run: npm run tauri build -- --bundles nsis
 
       - name: Upload macOS artifacts
         if: matrix.name == 'macos'
@@ -131,4 +136,3 @@ jobs:
           files: |
             openclaw-manager-macos/**/*.dmg
             openclaw-manager-windows/**/*.exe
-            openclaw-manager-windows/**/*.msi
