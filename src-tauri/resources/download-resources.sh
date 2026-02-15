@@ -55,15 +55,22 @@ esac
 cd ..
 echo ""
 
-# 下载 OpenClaw
-echo "📦 下载 OpenClaw..."
+# 下载 OpenClaw（离线安装包，不需要 Git）
+echo "📦 下载 OpenClaw（离线安装，无需 Git）..."
 cd openclaw
 
 if command -v npm &> /dev/null; then
-  echo "  使用 npm pack..."
+  echo "  使用 npm pack 打包..."
   rm -f *.tgz
   npm pack "$OPENCLAW_PACKAGE"
-  echo "  ✓ 下载完成: $(ls -1 *.tgz | head -1)"
+  
+  # 重命名为统一的文件名
+  for file in jerryan999-openclaw-zh-*.tgz; do
+    if [ -f "$file" ]; then
+      mv "$file" openclaw-zh.tgz
+      echo "  ✓ 已保存为: openclaw-zh.tgz"
+    fi
+  done
 else
   echo "  ⚠️  npm 未安装，跳过 OpenClaw 下载"
   echo "  请手动运行: npm pack $OPENCLAW_PACKAGE"
@@ -86,7 +93,13 @@ echo ""
 
 echo "✅ 完成！"
 echo ""
-echo "提示："
+echo "💡 提示："
+echo "  - OpenClaw 离线包安装时不需要 Git，更可靠"
 echo "  - 开发模式不需要下载所有平台的资源"
 echo "  - 生产构建时确保目标平台的资源已下载"
 echo "  - 可以在 CI/CD 中运行此脚本自动下载"
+echo ""
+echo "📦 打包体积影响："
+echo "  - Node.js (每个平台): ~40-50MB"
+echo "  - OpenClaw .tgz: ~10-20MB"
+echo "  - 总计（单平台）: ~50-70MB"

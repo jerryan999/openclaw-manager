@@ -6,13 +6,15 @@
 
 ```
 resources/
-├── nodejs/           # Node.js 预编译文件
+├── nodejs/           # Node.js 预编译文件（可选）
 │   ├── macos-arm64/  # macOS Apple Silicon
 │   ├── macos-x64/    # macOS Intel
 │   ├── windows-x64/  # Windows 64位
 │   └── linux-x64/    # Linux 64位
-└── openclaw/         # OpenClaw npm 包
-    └── package.tgz   # 打包的 npm 包
+├── git/              # Portable Git（仅 Windows，可选）
+│   └── git-portable-windows-x64.7z
+└── openclaw/         # OpenClaw npm 包（离线安装）
+    └── openclaw-zh.tgz   # 打包的 npm 包
 ```
 
 ## 下载资源
@@ -39,16 +41,35 @@ curl -o src-tauri/resources/nodejs/node-linux-x64.tar.gz \
   https://nodejs.org/dist/v22.12.0/node-v22.12.0-linux-x64.tar.gz
 ```
 
-### 2. OpenClaw npm 包
+### 2. OpenClaw npm 包（离线安装，推荐）
 
 ```bash
-# 下载 OpenClaw 包
+# 创建目录
+mkdir -p src-tauri/resources/openclaw
+
+# 下载并打包 OpenClaw（不需要 Git）
 cd src-tauri/resources/openclaw
 npm pack @jerryan999/openclaw-zh
 
-# 或者手动下载所有依赖
-npm install --global-style --no-save @jerryan999/openclaw-zh
+# 生成的文件类似：jerryan999-openclaw-zh-1.0.0.tgz
+# 重命名为统一的名字
+mv jerryan999-openclaw-zh-*.tgz openclaw-zh.tgz
 ```
+
+### 3. Portable Git（可选，仅 Windows）
+
+如果不想要求用户安装 Git，可以打包 Portable Git：
+
+```bash
+# 下载 Portable Git for Windows
+# 访问 https://github.com/git-for-windows/git/releases
+# 下载 PortableGit-<version>-64-bit.7z (~50MB)
+
+mkdir -p src-tauri/resources/git
+# 将下载的文件放到 src-tauri/resources/git/git-portable-windows-x64.7z
+```
+
+**注意**：实际上使用离线 .tgz 安装方式后，**不再需要 Git**，这是更推荐的方案。
 
 ## 注意事项
 

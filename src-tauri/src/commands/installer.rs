@@ -555,25 +555,87 @@ pub async fn install_openclaw() -> Result<InstallResult, String> {
     result
 }
 
+/// 检查是否有打包的离线 OpenClaw 包
+fn get_bundled_openclaw_package() -> Option<String> {
+    // 尝试在资源目录中查找 openclaw-zh.tgz
+    let resource_paths = vec![
+        "resources/openclaw/openclaw-zh.tgz",
+        "../resources/openclaw/openclaw-zh.tgz",
+        "openclaw-zh.tgz",
+    ];
+    
+    for path in resource_paths {
+        if std::path::Path::new(path).exists() {
+            info!("[安装OpenClaw] 找到离线包: {}", path);
+            return Some(path.to_string());
+        }
+    }
+    
+    debug!("[安装OpenClaw] 未找到离线包，将使用在线安装");
+    None
+}
+
 /// Windows 安装 OpenClaw
 async fn install_openclaw_windows() -> Result<InstallResult, String> {
-    // 先检查 Git 是否安装
-    if get_git_version().is_none() {
+    // 检查是否有打包的离线包
+    let bundled_package = get_bundled_openclaw_package();
+    
+    // 如果没有离线包，则需要 Git
+    if bundled_package.is_none() && get_git_version().is_none() {
         return Ok(InstallResult {
             success: false,
             message: "Git 未安装".to_string(),
             error: Some(
-                "安装 OpenClaw 需要 Git。\n\n请先安装 Git:\n\
-                1. 访问 https://git-scm.com/download/win\n\
-                2. 下载并安装 Git for Windows\n\
-                3. 安装完成后重启本应用\n\n\
-                或使用 winget 安装: winget install --id Git.Git -e --source winget"
+                "在线安装 OpenClaw 需要 Git。\n\n两个解决方案：\n\
+                方案1（推荐）：使用打包离线包\n  \
+                - 下载包含 OpenClaw 离线包的完整版本\n  \
+                - 无需 Git，安装更快更可靠\n\n\
+                方案2：安装 Git\n  \
+                1. 访问 https://git-scm.com/download/win\n  \
+                2. 下载并安装 Git for Windows\n  \
+                3. 安装完成后重启本应用\n  \
+                或使用: winget install --id Git.Git -e --source winget"
                     .to_string(),
             ),
         });
     }
 
-    let script = r#"
+    let script = if let Some(package_path) = bundled_package {
+        info!("[安装OpenClaw] 使用离线包: {}", package_path);
+        format!(
+            r#"
+$ErrorActionPreference = 'Stop'
+
+# 检查 Node.js
+$nodeVersion = node --version 2>$null
+if (-not $nodeVersion) {{
+    Write-Host "错误：请先安装 Node.js"
+    exit 1
+}}
+
+Write-Host "使用离线包安装 OpenClaw（无需 Git）..."
+Write-Host "包路径: {}"
+npm install -g "{}" --unsafe-perm
+
+# 刷新 PATH
+$npmPrefix = npm prefix -g
+$env:Path = "$env:Path;$npmPrefix"
+
+# 验证安装
+$openclawVersion = openclaw --version 2>$null
+if ($openclawVersion) {{
+    Write-Host "OpenClaw 安装成功: $openclawVersion"
+    exit 0
+}} else {{
+    Write-Host "OpenClaw 安装失败"
+    exit 1
+}}
+"#,
+            package_path, package_path
+        )
+    } else {
+        info!("[安装OpenClaw] 使用在线安装，需要 Git");
+        r#"
 $ErrorActionPreference = 'Stop'
 
 # 检查 Node.js
@@ -583,18 +645,18 @@ if (-not $nodeVersion) {
     exit 1
 }
 
-# 检查 Git
+# 检查 Git（在线安装需要）
 $gitVersion = git --version 2>$null
 if (-not $gitVersion) {
-    Write-Host "错误：请先安装 Git"
+    Write-Host "错误：在线安装需要 Git"
     Write-Host "下载地址: https://git-scm.com/download/win"
     exit 1
 }
 
-Write-Host "使用 npm 安装 OpenClaw 中文版（无广告版）..."
+Write-Host "使用 npm 在线安装 OpenClaw..."
 npm install -g @jerryan999/openclaw-zh --unsafe-perm
 
-# 刷新 PATH，确保能找到新安装的 openclaw 命令
+# 刷新 PATH
 $npmPrefix = npm prefix -g
 $env:Path = "$env:Path;$npmPrefix"
 
@@ -607,9 +669,11 @@ if ($openclawVersion) {
     Write-Host "OpenClaw 安装失败"
     exit 1
 }
-"#;
+"#
+        .to_string()
+    };
     
-    match shell::run_powershell_output(script) {
+    match shell::run_powershell_output(&script) {
         Ok(output) => {
             if get_openclaw_version().is_some() {
                 Ok(InstallResult {
@@ -635,25 +699,55 @@ if ($openclawVersion) {
 
 /// Unix 系统安装 OpenClaw
 async fn install_openclaw_unix() -> Result<InstallResult, String> {
-    let script = r#"
+    // 检查是否有打包的离线包
+    let bundled_package = get_bundled_openclaw_package();
+    
+    let script = if let Some(package_path) = bundled_package {
+        info!("[安装OpenClaw] 使用离线包: {}", package_path);
+        format!(
+            r#"
 # 检查 Node.js
 if ! command -v node &> /dev/null; then
     echo "错误：请先安装 Node.js"
     exit 1
 fi
 
-echo "使用 npm 安装 OpenClaw 中文版（无广告版）..."
-npm install -g @jerryan999/openclaw-zh --unsafe-perm
+echo "使用离线包安装 OpenClaw（无需 Git，更快更可靠）..."
+echo "包路径: {}"
+npm install -g "{}"
 
-# 刷新命令缓存，确保能找到新安装的 openclaw 命令
+# 刷新命令缓存
 hash -r 2>/dev/null || true
 export PATH="$PATH:$(npm prefix -g)/bin"
 
 # 验证安装
 openclaw --version
-"#;
+"#,
+            package_path, package_path
+        )
+    } else {
+        info!("[安装OpenClaw] 使用在线安装");
+        r#"
+# 检查 Node.js
+if ! command -v node &> /dev/null; then
+    echo "错误：请先安装 Node.js"
+    exit 1
+fi
+
+echo "使用 npm 在线安装 OpenClaw..."
+npm install -g @jerryan999/openclaw-zh --unsafe-perm
+
+# 刷新命令缓存
+hash -r 2>/dev/null || true
+export PATH="$PATH:$(npm prefix -g)/bin"
+
+# 验证安装
+openclaw --version
+"#
+        .to_string()
+    };
     
-    match shell::run_bash_output(script) {
+    match shell::run_bash_output(&script) {
         Ok(output) => Ok(InstallResult {
             success: true,
             message: format!("OpenClaw 安装成功！{}", output),
