@@ -10,7 +10,8 @@ import {
   ExternalLink,
   Cpu,
   Package,
-  GitBranch
+  GitBranch,
+  Terminal,
 } from 'lucide-react';
 import { setupLogger } from '../../lib/logger';
 
@@ -45,6 +46,7 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
   const [envStatus, setEnvStatus] = useState<EnvironmentStatus | null>(null);
   const [checking, setChecking] = useState(true);
   const [installing, setInstalling] = useState<'nodejs' | 'openclaw' | null>(null);
+  const [openingTerminal, setOpeningTerminal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'check' | 'install' | 'complete'>('check');
 
@@ -168,6 +170,17 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
       case 'macos': return 'macOS';
       case 'linux': return 'Linux';
       default: return os;
+    }
+  };
+
+  const handleOpenDebugTerminal = async () => {
+    setOpeningTerminal(true);
+    try {
+      await invoke<string>('open_debug_terminal');
+    } catch (e) {
+      setError(`打开诊断终端失败: ${e}`);
+    } finally {
+      setOpeningTerminal(false);
     }
   };
 
@@ -386,11 +399,29 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
             <div className="flex gap-3 pt-4 border-t border-dark-700/50">
               <button
                 onClick={checkEnvironment}
-                disabled={checking || installing !== null}
+                disabled={checking || installing !== null || openingTerminal}
                 className="flex-1 btn-secondary py-2.5 flex items-center justify-center gap-2"
               >
                 <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
                 重新检查
+              </button>
+
+              <button
+                onClick={handleOpenDebugTerminal}
+                disabled={checking || installing !== null || openingTerminal}
+                className="flex-1 btn-secondary py-2.5 flex items-center justify-center gap-2"
+              >
+                {openingTerminal ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    打开中...
+                  </>
+                ) : (
+                  <>
+                    <Terminal className="w-4 h-4" />
+                    打开诊断终端
+                  </>
+                )}
               </button>
               
               {envStatus.ready && (
