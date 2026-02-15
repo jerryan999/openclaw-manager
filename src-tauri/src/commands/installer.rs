@@ -16,6 +16,8 @@ pub struct EnvironmentStatus {
     pub git_installed: bool,
     /// Git 版本
     pub git_version: Option<String>,
+    /// 是否有离线安装包
+    pub has_offline_package: bool,
     /// OpenClaw 是否安装
     pub openclaw_installed: bool,
     /// OpenClaw 版本
@@ -80,13 +82,28 @@ pub async fn check_environment() -> Result<EnvironmentStatus, String> {
     let config_dir_exists = std::path::Path::new(&config_dir).exists();
     info!("[环境检查] 配置目录: {}, exists={}", config_dir, config_dir_exists);
     
-    // Windows 需要 Git 来安装 npm 包，Unix 系统不强制要求
-    let ready = if platform::is_windows() {
-        node_installed && node_version_ok && git_installed && openclaw_installed
+    // 检查是否有离线安装包
+    let has_offline_package = get_bundled_openclaw_package().is_some();
+    info!("[环境检查] 离线安装包: {}", if has_offline_package { "存在" } else { "不存在" });
+    
+    // 环境就绪判断：
+    // 1. 如果有离线包：只需要 Node.js（无论什么系统）
+    // 2. 如果没有离线包：Windows 需要 Git，Unix 不需要
+    let ready = if openclaw_installed {
+        // OpenClaw 已安装，就绪
+        true
+    } else if has_offline_package {
+        // 有离线包，只需要 Node.js
+        node_installed && node_version_ok
+    } else if platform::is_windows() {
+        // Windows 在线安装需要 Node.js + Git
+        node_installed && node_version_ok && git_installed
     } else {
-        node_installed && node_version_ok && openclaw_installed
+        // Unix 在线安装只需要 Node.js
+        node_installed && node_version_ok
     };
-    info!("[环境检查] 环境就绪状态: ready={}", ready);
+    info!("[环境检查] 环境就绪状态: ready={}, 离线包={}, Windows={}", 
+        ready, has_offline_package, platform::is_windows());
     
     Ok(EnvironmentStatus {
         node_installed,
@@ -94,6 +111,7 @@ pub async fn check_environment() -> Result<EnvironmentStatus, String> {
         node_version_ok,
         git_installed,
         git_version,
+        has_offline_package,
         openclaw_installed,
         openclaw_version,
         config_dir_exists,
@@ -164,7 +182,7 @@ fn get_node_version() -> Option<String> {
 /// 获取 Git 版本
 fn get_git_version() -> Option<String> {
     if platform::is_windows() {
-        // Windows: 尝试 cmd 和 PowerShell
+        // Windows: 先尝试直接调用
         if let Ok(v) = shell::run_cmd_output("git --version") {
             if !v.is_empty() {
                 info!("[环境检查] 通过 cmd 找到 Git: {}", v.trim());
@@ -179,6 +197,45 @@ fn get_git_version() -> Option<String> {
             }
         }
         
+        // 检查常见的 Git 安装路径
+        let common_paths = vec![
+            "C:\\Program Files\\Git\\cmd\\git.exe",
+            "C:\\Program Files (x86)\\Git\\cmd\\git.exe",
+            "C:\\Program Files\\Git\\bin\\git.exe",
+            "C:\\Program Files (x86)\\Git\\bin\\git.exe",
+        ];
+        
+        if let Some(home) = dirs::home_dir() {
+            let user_local = format!("{}\\AppData\\Local\\Programs\\Git\\cmd\\git.exe", home.display());
+            let user_git = format!("{}\\scoop\\apps\\git\\current\\cmd\\git.exe", home.display());
+            
+            for path in vec![user_local, user_git] {
+                if std::path::Path::new(&path).exists() {
+                    // 尝试执行找到的 git
+                    let cmd = format!("\"{}\" --version", path);
+                    if let Ok(v) = shell::run_cmd_output(&cmd) {
+                        if !v.is_empty() {
+                            info!("[环境检查] 在 {} 找到 Git: {}", path, v.trim());
+                            return Some(v.trim().to_string());
+                        }
+                    }
+                }
+            }
+        }
+        
+        for path in common_paths {
+            if std::path::Path::new(path).exists() {
+                let cmd = format!("\"{}\" --version", path);
+                if let Ok(v) = shell::run_cmd_output(&cmd) {
+                    if !v.is_empty() {
+                        info!("[环境检查] 在 {} 找到 Git: {}", path, v.trim());
+                        return Some(v.trim().to_string());
+                    }
+                }
+            }
+        }
+        
+        warn!("[环境检查] 未找到 Git，请确保 Git 已安装并在 PATH 中");
         None
     } else {
         // Unix: 直接调用

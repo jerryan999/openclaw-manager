@@ -20,6 +20,7 @@ interface EnvironmentStatus {
   node_version_ok: boolean;
   git_installed: boolean;
   git_version: string | null;
+  has_offline_package: boolean;
   openclaw_installed: boolean;
   openclaw_version: string | null;
   config_dir_exists: boolean;
@@ -241,20 +242,32 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                   <div className={`p-2 rounded-lg ${
                     envStatus.git_installed 
                       ? 'bg-green-500/20 text-green-400' 
-                      : 'bg-yellow-500/20 text-yellow-400'
+                      : envStatus.has_offline_package
+                        ? 'bg-blue-500/20 text-blue-400'
+                        : 'bg-yellow-500/20 text-yellow-400'
                   }`}>
                     <GitBranch className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-white font-medium">Git</p>
+                    <p className="text-white font-medium">
+                      Git {envStatus.has_offline_package && !envStatus.git_installed && '(可选)'}
+                    </p>
                     <p className="text-sm text-dark-400">
-                      {envStatus.git_version || '未安装 (安装 OpenClaw 需要)'}
+                      {envStatus.git_version 
+                        ? envStatus.git_version 
+                        : envStatus.has_offline_package
+                          ? '未安装 (已有离线包，无需 Git)'
+                          : '未安装 (在线安装需要)'}
                     </p>
                   </div>
                 </div>
                 
                 {envStatus.git_installed ? (
                   <CheckCircle2 className="w-6 h-6 text-green-400" />
+                ) : envStatus.has_offline_package ? (
+                  <span className="text-xs text-blue-400 px-3 py-1 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                    可选
+                  </span>
                 ) : (
                   <a
                     href="https://git-scm.com/download/win"
@@ -295,19 +308,22 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                   disabled={
                     installing !== null || 
                     !envStatus.node_version_ok || 
-                    (envStatus.os === 'windows' && !envStatus.git_installed)
+                    (envStatus.os === 'windows' && !envStatus.has_offline_package && !envStatus.git_installed)
                   }
                   className={`btn-primary text-sm px-4 py-2 flex items-center gap-2 ${
-                    !envStatus.node_version_ok || (envStatus.os === 'windows' && !envStatus.git_installed)
+                    !envStatus.node_version_ok || 
+                    (envStatus.os === 'windows' && !envStatus.has_offline_package && !envStatus.git_installed)
                       ? 'opacity-50 cursor-not-allowed' 
                       : ''
                   }`}
                   title={
                     !envStatus.node_version_ok 
                       ? '请先安装 Node.js' 
-                      : (envStatus.os === 'windows' && !envStatus.git_installed)
-                        ? '请先安装 Git'
-                        : ''
+                      : (envStatus.os === 'windows' && !envStatus.has_offline_package && !envStatus.git_installed)
+                        ? '请先安装 Git（或使用包含离线包的版本）'
+                        : envStatus.has_offline_package
+                          ? '使用离线包安装，无需 Git'
+                          : ''
                   }
                 >
                   {installing === 'openclaw' ? (
@@ -318,7 +334,7 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                   ) : (
                     <>
                       <Download className="w-4 h-4" />
-                      安装
+                      安装{envStatus.has_offline_package && ' (离线)'}
                     </>
                   )}
                 </button>
