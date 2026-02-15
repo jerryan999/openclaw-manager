@@ -273,6 +273,17 @@ openclaw-manager/
 | Windows | `.msi`, `.exe` |
 | Linux | `.deb`, `.AppImage` |
 
+### Windows 离线安装包说明
+
+Windows 版支持离线运行时打包。打包时会把 `src-tauri/resources/**` 一并放入安装包，并在首次运行自动解压到本地运行时目录。
+
+- 内置 Node.js：`src-tauri/resources/nodejs/node-windows-x64.zip`
+- 内置 OpenClaw 包：`src-tauri/resources/openclaw/openclaw-zh.tgz`
+- 可选内置 Git（便携版 zip）：放到 `src-tauri/resources/git/`，支持文件名：
+  - `git-windows-x64.zip`
+  - `git-portable.zip`
+  - `PortableGit.zip`
+
 ## 🎨 设计理念
 
 - **暗色主题**：护眼舒适，适合长时间使用
