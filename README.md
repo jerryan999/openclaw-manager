@@ -4,10 +4,13 @@
 
 > **✨ 本项目使用 [jerryan999/OpenClawChinese](https://github.com/jerryan999/OpenClawChinese) 无广告中文版。**
 
+> **🎁 v0.0.12+ 为完全离线版：内置 Node.js + OpenClaw，开箱即用，无需任何配置！** [查看详情](OFFLINE.md)
+
 ![Platform](https://img.shields.io/badge/platform-macOS%20|%20Windows%20|%20Linux-blue)
 ![Tauri](https://img.shields.io/badge/Tauri-2.0-orange)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![Rust](https://img.shields.io/badge/Rust-1.70+-red)
+![Offline](https://img.shields.io/badge/mode-完全离线-green)
 
 ## 📸 界面预览
 
