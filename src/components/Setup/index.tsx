@@ -91,6 +91,9 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
       } else if (result.message.includes('重启')) {
         // 需要重启应用
         setError('Node.js 安装完成，请重启应用以使环境变量生效');
+      } else if (envStatus?.os === 'windows') {
+        // Windows 离线包不应回退到在线安装终端
+        setError(`Node.js 离线安装失败: ${result.error || result.message}`);
       } else {
         // 打开终端手动安装
         await invoke<string>('open_install_terminal', { installType: 'nodejs' });
@@ -98,11 +101,15 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
       }
     } catch (e) {
       // 如果自动安装失败，打开终端
-      try {
-        await invoke<string>('open_install_terminal', { installType: 'nodejs' });
-        setError('已打开安装终端，请在终端中完成安装后点击"重新检查"');
-      } catch (termErr) {
-        setError(`安装失败: ${e}。${termErr}`);
+      if (envStatus?.os === 'windows') {
+        setError(`Node.js 离线安装失败: ${e}`);
+      } else {
+        try {
+          await invoke<string>('open_install_terminal', { installType: 'nodejs' });
+          setError('已打开安装终端，请在终端中完成安装后点击"重新检查"');
+        } catch (termErr) {
+          setError(`安装失败: ${e}。${termErr}`);
+        }
       }
     } finally {
       setInstalling(null);
@@ -125,6 +132,8 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
         setupLogger.info('✅ 配置初始化完成');
         // 重新检查环境
         await checkEnvironment();
+      } else if (envStatus?.os === 'windows') {
+        setError(`OpenClaw 离线安装失败: ${result.error || result.message}`);
       } else {
         setupLogger.warn('自动安装失败，打开终端手动安装');
         // 打开终端手动安装
@@ -133,11 +142,15 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
       }
     } catch (e) {
       setupLogger.error('安装失败，尝试打开终端', e);
-      try {
-        await invoke<string>('open_install_terminal', { installType: 'openclaw' });
-        setError('已打开安装终端，请在终端中完成安装后点击"重新检查"');
-      } catch (termErr) {
-        setError(`安装失败: ${e}。${termErr}`);
+      if (envStatus?.os === 'windows') {
+        setError(`OpenClaw 离线安装失败: ${e}`);
+      } else {
+        try {
+          await invoke<string>('open_install_terminal', { installType: 'openclaw' });
+          setError('已打开安装终端，请在终端中完成安装后点击"重新检查"');
+        } catch (termErr) {
+          setError(`安装失败: ${e}。${termErr}`);
+        }
       }
     } finally {
       setInstalling(null);
