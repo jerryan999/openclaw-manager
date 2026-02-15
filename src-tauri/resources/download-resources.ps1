@@ -35,16 +35,22 @@ try {
 Set-Location ".."
 Write-Host ""
 
-# 下载 OpenClaw
-Write-Host "📦 下载 OpenClaw..."
+# 下载 OpenClaw（离线安装，无需 Git）
+Write-Host "📦 下载 OpenClaw（离线安装，无需 Git）..."
 Set-Location "openclaw"
 
 if (Get-Command npm -ErrorAction SilentlyContinue) {
-    Write-Host "  使用 npm pack..."
+    Write-Host "  使用 npm pack 打包..."
     Remove-Item "*.tgz" -ErrorAction SilentlyContinue
     npm pack $OPENCLAW_PACKAGE
-    $tgzFile = Get-ChildItem "*.tgz" | Select-Object -First 1
-    Write-Host "  ✓ 下载完成: $($tgzFile.Name)"
+    
+    # 重命名为统一的文件名
+    $tgzFiles = Get-ChildItem "jerryan999-openclaw-zh-*.tgz"
+    if ($tgzFiles.Count -gt 0) {
+        $tgzFile = $tgzFiles[0]
+        Move-Item -Path $tgzFile.Name -Destination "openclaw-zh.tgz" -Force
+        Write-Host "  ✓ 已保存为: openclaw-zh.tgz"
+    }
 } else {
     Write-Host "  ⚠️  npm 未安装，跳过 OpenClaw 下载"
     Write-Host "  请手动运行: npm pack $OPENCLAW_PACKAGE"
@@ -71,7 +77,13 @@ Write-Host ""
 
 Write-Host "✅ 完成！"
 Write-Host ""
-Write-Host "提示："
-Write-Host "  - 开发模式不需要下载资源"
-Write-Host "  - 生产构建时确保资源已下载"
+Write-Host "💡 提示："
+Write-Host "  - OpenClaw 离线包安装时不需要 Git，更可靠"
+Write-Host "  - 开发模式不需要下载所有平台的资源"
+Write-Host "  - 生产构建时确保目标平台的资源已下载"
 Write-Host "  - 可以在 CI/CD 中运行此脚本自动下载"
+Write-Host ""
+Write-Host "📦 打包体积影响："
+Write-Host "  - Node.js (Windows): ~40-50MB"
+Write-Host "  - OpenClaw .tgz: ~10-20MB"
+Write-Host "  - 总计: ~50-70MB"
