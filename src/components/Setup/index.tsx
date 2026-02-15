@@ -18,6 +18,7 @@ interface EnvironmentStatus {
   node_installed: boolean;
   node_version: string | null;
   node_version_ok: boolean;
+  has_bundled_nodejs: boolean;
   git_installed: boolean;
   git_version: string | null;
   has_offline_package: boolean;
@@ -196,23 +197,27 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${
-                  envStatus.node_installed && envStatus.node_version_ok 
+                  (envStatus.node_installed && envStatus.node_version_ok) || envStatus.has_bundled_nodejs
                     ? 'bg-green-500/20 text-green-400' 
                     : 'bg-red-500/20 text-red-400'
                 }`}>
                   <Cpu className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-white font-medium">Node.js</p>
+                  <p className="text-white font-medium">
+                    Node.js {envStatus.has_bundled_nodejs && !envStatus.node_installed && '(已内置)'}
+                  </p>
                   <p className="text-sm text-dark-400">
                     {envStatus.node_version 
                       ? `${envStatus.node_version} ${envStatus.node_version_ok ? '✓' : '(需要 v22+)'}` 
-                      : '未安装'}
+                      : envStatus.has_bundled_nodejs
+                        ? '已内置 v22+ (无需安装)'
+                        : '未安装'}
                   </p>
                 </div>
               </div>
               
-              {envStatus.node_installed && envStatus.node_version_ok ? (
+              {(envStatus.node_installed && envStatus.node_version_ok) || envStatus.has_bundled_nodejs ? (
                 <CheckCircle2 className="w-6 h-6 text-green-400" />
               ) : (
                 <button
