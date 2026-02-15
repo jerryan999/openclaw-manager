@@ -121,8 +121,23 @@ pub async fn start_service() -> Result<String, String> {
 pub async fn stop_service() -> Result<String, String> {
     info!("[服务] 停止服务...");
     
-    let _ = shell::run_openclaw(&["gateway", "stop"]);
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    // 先获取当前 PID
+    let initial_status = get_service_status().await?;
+    if !initial_status.running {
+        info!("[服务] 服务未运行");
+        return Ok("服务已停止".to_string());
+    }
+    
+    let pid = initial_status.pid;
+    info!("[服务] 检测到服务运行中, PID: {:?}", pid);
+    
+    // 第一次尝试：使用 openclaw gateway stop
+    info!("[服务] 尝试优雅停止 (openclaw gateway stop)...");
+    match shell::run_openclaw(&["gateway", "stop"]) {
+        Ok(output) => info!("[服务] stop 命令输出: {}", output),
+        Err(e) => info!("[服务] stop 命令失败: {}", e),
+    }
+    std::thread::sleep(std::time::Duration::from_secs(1));
     
     let status = get_service_status().await?;
     if !status.running {
@@ -130,16 +145,96 @@ pub async fn stop_service() -> Result<String, String> {
         return Ok("服务已停止".to_string());
     }
     
-    // 尝试强制停止
-    let _ = shell::run_openclaw(&["gateway", "stop", "--force"]);
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    // 第二次尝试：使用 --force 参数
+    info!("[服务] 尝试强制停止 (openclaw gateway stop --force)...");
+    match shell::run_openclaw(&["gateway", "stop", "--force"]) {
+        Ok(output) => info!("[服务] stop --force 命令输出: {}", output),
+        Err(e) => info!("[服务] stop --force 命令失败: {}", e),
+    }
+    std::thread::sleep(std::time::Duration::from_secs(1));
     
     let status = get_service_status().await?;
-    if status.running {
-        Err(format!("无法停止服务，PID: {:?}", status.pid))
-    } else {
+    if !status.running {
         info!("[服务] ✓ 已停止");
-        Ok("服务已停止".to_string())
+        return Ok("服务已停止".to_string());
+    }
+    
+    // 第三次尝试：直接 kill 进程
+    if let Some(pid) = pid {
+        info!("[服务] 使用系统命令终止进程 PID: {}", pid);
+        let kill_result = kill_process(pid);
+        match kill_result {
+            Ok(_) => info!("[服务] kill 命令执行成功"),
+            Err(e) => info!("[服务] kill 命令失败: {}", e),
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        
+        let status = get_service_status().await?;
+        if !status.running {
+            info!("[服务] ✓ 已停止 (通过 kill 命令)");
+            return Ok("服务已停止".to_string());
+        }
+        
+        // 最后尝试：强制 kill -9
+        info!("[服务] 使用 kill -9 强制终止进程 PID: {}", pid);
+        let force_kill_result = force_kill_process(pid);
+        match force_kill_result {
+            Ok(_) => info!("[服务] kill -9 命令执行成功"),
+            Err(e) => info!("[服务] kill -9 命令失败: {}", e),
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        
+        let status = get_service_status().await?;
+        if !status.running {
+            info!("[服务] ✓ 已停止 (通过 kill -9)");
+            return Ok("服务已停止".to_string());
+        }
+    }
+    
+    Err(format!("无法停止服务，PID: {:?}", pid))
+}
+
+/// 终止进程 (SIGTERM)
+fn kill_process(pid: u32) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        Command::new("kill")
+            .arg(pid.to_string())
+            .output()
+            .map_err(|e| format!("kill 命令失败: {}", e))?;
+        Ok(())
+    }
+    
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new("taskkill");
+        cmd.args(["/PID", &pid.to_string()]);
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.output()
+            .map_err(|e| format!("taskkill 命令失败: {}", e))?;
+        Ok(())
+    }
+}
+
+/// 强制终止进程 (SIGKILL / taskkill /F)
+fn force_kill_process(pid: u32) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        Command::new("kill")
+            .args(["-9", &pid.to_string()])
+            .output()
+            .map_err(|e| format!("kill -9 命令失败: {}", e))?;
+        Ok(())
+    }
+    
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new("taskkill");
+        cmd.args(["/F", "/PID", &pid.to_string()]);
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.output()
+            .map_err(|e| format!("taskkill /F 命令失败: {}", e))?;
+        Ok(())
     }
 }
 
