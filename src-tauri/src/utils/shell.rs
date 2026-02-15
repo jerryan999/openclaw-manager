@@ -208,6 +208,34 @@ pub fn run_powershell_output(script: &str) -> Result<String, String> {
     }
 }
 
+/// 在登录 shell 中执行脚本（仅 Unix）
+/// 会 source 用户 profile（.zshrc / .bash_profile），保证 nvm/fnm 等环境与终端一致
+#[cfg(not(windows))]
+pub fn run_login_shell_output(script: &str) -> Result<String, String> {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+    let mut command = Command::new(&shell);
+    command.arg("-l").arg("-c").arg(script);
+    // 不覆盖 PATH，让登录 shell 的 profile 决定，确保 nvm/fnm 等生效
+    match command.output() {
+        Ok(output) => {
+            if output.status.success() {
+                Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                if stderr.is_empty() {
+                    Err(format!(
+                        "Command failed with exit code: {:?}",
+                        output.status.code()
+                    ))
+                } else {
+                    Err(stderr)
+                }
+            }
+        }
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 /// 跨平台执行脚本命令
 /// Windows 上使用 cmd.exe（避免 PowerShell 执行策略问题）
 pub fn run_script_output(script: &str) -> Result<String, String> {
@@ -269,7 +297,6 @@ pub fn get_openclaw_path() -> Option<String> {
     if !platform::is_windows() {
         if let Ok(path) = run_bash_output("source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null; which openclaw 2>/dev/null") {
             if !path.is_empty() && std::path::Path::new(&path).exists() {
-                info!("[Shell] 通过用户 shell 找到 openclaw: {}", path);
                 return Some(path);
             }
         }
@@ -362,28 +389,28 @@ const AGENT_TEST_TEMPLATES: &[&str] = &[
     "BOOTSTRAP.md",
 ];
 
-/// 创建用于 agent 测试的临时工作区（包含 docs/reference/templates 下所需模板），
-/// 避免在 Manager 项目目录下执行 agent 时报 Missing workspace template。
-pub fn create_agent_test_workspace() -> Result<PathBuf, String> {
-    let name = format!(
-        "openclaw-manager-agent-test-{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0)
-    );
-    let root = std::env::temp_dir().join(name);
-    let templates_dir = root.join("docs").join("reference").join("templates");
-    fs::create_dir_all(&templates_dir).map_err(|e| format!("创建临时工作区失败: {}", e))?;
+/// 默认 openclaw 工作区目录：~/.openclaw（与 openclaw CLI 约定一致）
+pub fn get_openclaw_workspace_dir() -> Result<PathBuf, String> {
+    let dir = PathBuf::from(platform::get_config_dir());
+    fs::create_dir_all(&dir).map_err(|e| format!("创建工作区目录失败: {}", e))?;
+    Ok(dir)
+}
 
-    let placeholder = b"# Placeholder\nMinimal template for OpenClaw Manager AI connection test.\n";
+/// 在指定工作区下确保存在 docs/reference/templates 及所需模板文件；
+/// 若文件不存在则写入占位内容，避免 openclaw agent 报 Missing workspace template。
+pub fn ensure_agent_templates_in_workspace(workspace: &Path) -> Result<(), String> {
+    let templates_dir = workspace.join("docs").join("reference").join("templates");
+    fs::create_dir_all(&templates_dir).map_err(|e| format!("创建模板目录失败: {}", e))?;
+
+    let placeholder = b"# Placeholder\nMinimal template for OpenClaw Manager.\n";
     for name in AGENT_TEST_TEMPLATES {
-        fs::write(templates_dir.join(name), placeholder)
-            .map_err(|e| format!("写入 {} 失败: {}", name, e))?;
+        let path = templates_dir.join(name);
+        if !path.exists() {
+            fs::write(&path, placeholder).map_err(|e| format!("写入 {} 失败: {}", name, e))?;
+            debug!("[Shell] 已创建占位模板: {}", path.display());
+        }
     }
-
-    debug!("[Shell] 临时 agent 工作区: {} (templates: {:?})", root.display(), AGENT_TEST_TEMPLATES);
-    Ok(root)
+    Ok(())
 }
 
 /// 在指定工作目录下执行 openclaw 命令（用于 agent 测试，避免 Missing workspace template）

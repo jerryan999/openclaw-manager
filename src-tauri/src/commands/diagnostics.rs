@@ -171,25 +171,24 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
     Ok(results)
 }
 
-/// 测试 AI 连接（使用 openclaw agent，在临时工作区中执行以避免 Missing workspace template）
+/// 测试 AI 连接（使用 openclaw agent，在默认工作区 ~/.openclaw 中执行）
 #[command]
 pub async fn test_ai_connection() -> Result<AITestResult, String> {
     info!("[AI测试] 开始测试 AI 连接...");
 
-    let workspace = shell::create_agent_test_workspace()
-        .map_err(|e| format!("创建测试工作区失败: {}", e))?;
+    let workspace = shell::get_openclaw_workspace_dir()
+        .map_err(|e| format!("获取工作区失败: {}", e))?;
+    shell::ensure_agent_templates_in_workspace(&workspace)
+        .map_err(|e| format!("准备工作区模板失败: {}", e))?;
 
     let start = std::time::Instant::now();
-    info!("[AI测试] 执行: openclaw agent --local --to +1234567890 --message 回复 OK");
+    info!("[AI测试] 执行: openclaw agent --local --to +1234567890 --message 回复 OK (cwd={})", workspace.display());
     let result = shell::run_openclaw_with_cwd(
         &["agent", "--local", "--to", "+1234567890", "--message", "回复 OK"],
         &workspace,
     );
     let latency = start.elapsed().as_millis() as u64;
     info!("[AI测试] 命令执行完成, 耗时: {}ms", latency);
-
-    // 尝试删除临时工作区（忽略失败）
-    let _ = std::fs::remove_dir_all(&workspace);
 
     match result {
         Ok(output) => {

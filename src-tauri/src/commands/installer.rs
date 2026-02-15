@@ -924,9 +924,9 @@ pub async fn uninstall_openclaw() -> Result<InstallResult, String> {
 /// Windows 卸载 OpenClaw
 async fn uninstall_openclaw_windows() -> Result<InstallResult, String> {
     // 使用 cmd.exe 执行 npm uninstall，避免 PowerShell 执行策略问题
-    info!("[卸载OpenClaw] 执行 npm uninstall -g @qingchencloud/openclaw-zh...");
+    info!("[卸载OpenClaw] 执行 npm uninstall -g @jerryan999/openclaw-zh...");
     
-    match shell::run_cmd_output("npm uninstall -g @qingchencloud/openclaw-zh") {
+    match shell::run_cmd_output("npm uninstall -g @jerryan999/openclaw-zh") {
         Ok(output) => {
             info!("[卸载OpenClaw] npm 输出: {}", output);
             
@@ -958,10 +958,38 @@ async fn uninstall_openclaw_windows() -> Result<InstallResult, String> {
 }
 
 /// Unix 系统卸载 OpenClaw
+/// 1) 在登录 shell 中执行，保证 nvm/fnm 等环境与用户终端一致
+/// 2) 使用与 openclaw 同目录的 npm，确保从正确的全局空间卸载
 async fn uninstall_openclaw_unix() -> Result<InstallResult, String> {
-    let script = r#"
-echo "卸载 OpenClaw..."
-npm uninstall -g @qingchencloud/openclaw-zh
+    let npm_cmd = shell::get_openclaw_path()
+        .and_then(|p| {
+            std::path::Path::new(&p)
+                .parent()
+                .map(|dir| dir.join("npm").display().to_string())
+        })
+        .filter(|npm_path| std::path::Path::new(npm_path).exists());
+
+    let script = if let Some(ref npm) = npm_cmd {
+        info!("[卸载OpenClaw] 使用与 openclaw 同目录的 npm 执行卸载: {}", npm);
+        // 使用与 openclaw 同目录的 npm，确保从正确的全局空间卸载（如 nvm 安装的包）
+        format!(
+            r#"echo "卸载 OpenClaw..."
+'{}' uninstall -g @jerryan999/openclaw-zh
+
+# 验证卸载
+if command -v openclaw &> /dev/null; then
+    echo "警告：openclaw 命令仍然存在"
+    exit 1
+else
+    echo "OpenClaw 已成功卸载"
+    exit 0
+fi"#,
+            npm
+        )
+    } else {
+        info!("[卸载OpenClaw] 在登录 shell 中执行 npm uninstall（使用用户环境）");
+        r#"echo "卸载 OpenClaw..."
+npm uninstall -g @jerryan999/openclaw-zh
 
 # 验证卸载
 if command -v openclaw &> /dev/null; then
@@ -971,19 +999,25 @@ else
     echo "OpenClaw 已成功卸载"
     exit 0
 fi
-"#;
-    
-    match shell::run_bash_output(script) {
+"#
+        .to_string()
+    };
+
+    // 在登录 shell 中执行，使 nvm/fnm 等与用户终端环境一致，避免用错 npm/node
+    match shell::run_login_shell_output(&script) {
         Ok(output) => Ok(InstallResult {
             success: true,
             message: format!("OpenClaw 已成功卸载！{}", output),
             error: None,
         }),
-        Err(e) => Ok(InstallResult {
-            success: false,
-            message: "OpenClaw 卸载失败".to_string(),
-            error: Some(e),
-        }),
+        Err(e) => {
+            warn!("[卸载OpenClaw] 卸载脚本执行失败: {}", e);
+            Ok(InstallResult {
+                success: false,
+                message: "OpenClaw 卸载失败".to_string(),
+                error: Some(e),
+            })
+        }
     }
 }
 
@@ -1051,9 +1085,9 @@ pub async fn check_openclaw_update() -> Result<UpdateInfo, String> {
 fn get_latest_openclaw_version() -> Option<String> {
     // 使用 npm view 获取最新版本
     let result = if platform::is_windows() {
-        shell::run_cmd_output("npm view @qingchencloud/openclaw-zh version")
+        shell::run_cmd_output("npm view @jerryan999/openclaw-zh version")
     } else {
-        shell::run_bash_output("npm view @qingchencloud/openclaw-zh version 2>/dev/null")
+        shell::run_bash_output("npm view @jerryan999/openclaw-zh version 2>/dev/null")
     };
     
     match result {
