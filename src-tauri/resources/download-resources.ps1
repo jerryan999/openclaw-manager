@@ -42,7 +42,9 @@ Set-Location "openclaw"
 if (Get-Command npm -ErrorAction SilentlyContinue) {
     Write-Host "  使用 npm pack 打包..."
     Remove-Item "*.tgz" -ErrorAction SilentlyContinue
-    npm pack $OPENCLAW_PACKAGE
+    # 强制从 registry 获取最新版本信息
+    npm view "$OPENCLAW_PACKAGE" version | Out-Null
+    npm pack $OPENCLAW_PACKAGE --prefer-online
     
     # 重命名为统一的文件名
     $tgzFiles = Get-ChildItem "jerryan999-openclaw-zh-*.tgz"
