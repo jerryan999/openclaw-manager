@@ -144,35 +144,6 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
         },
     });
 
-    // 检查环境变量文件
-    let env_path = platform::get_env_file_path();
-    let env_exists = std::path::Path::new(&env_path).exists();
-    results.push(DiagnosticResult {
-        name: "环境变量".to_string(),
-        passed: env_exists,
-        message: if env_exists {
-            format!("环境变量文件存在: {}", env_path)
-        } else {
-            "环境变量文件不存在".to_string()
-        },
-        suggestion: if env_exists {
-            None
-        } else {
-            Some("请配置 AI API Key".to_string())
-        },
-    });
-
-    // 运行 openclaw doctor
-    if openclaw_installed {
-        let doctor_result = shell::run_openclaw(&["doctor"]);
-        results.push(DiagnosticResult {
-            name: "OpenClaw Doctor".to_string(),
-            passed: doctor_result.is_ok() && !doctor_result.as_ref().unwrap().contains("invalid"),
-            message: doctor_result.unwrap_or_else(|e| e),
-            suggestion: None,
-        });
-    }
-
     Ok(results)
 }
 
