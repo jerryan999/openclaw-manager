@@ -85,6 +85,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "offline openclaw install failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path "$offlinePrefix/openclaw.cmd")) { throw "openclaw.cmd not found after preinstall" }
 
+          $offlineZip = "src-tauri/resources/offline/npm-global.zip"
+          if (Test-Path $offlineZip) { Remove-Item -Force $offlineZip }
+          tar.exe -a -c -f $offlineZip -C $offlinePrefix .
+          if ($LASTEXITCODE -ne 0) { throw "failed to create offline npm-global zip" }
+          Remove-Item -Recurse -Force $offlinePrefix
+
           Remove-Item -Recurse -Force $extractDir
 
       - name: Build Tauri app (macOS)
