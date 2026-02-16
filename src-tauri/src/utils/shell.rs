@@ -24,6 +24,9 @@ const NODE_RESOURCE_RELATIVE_PATH: &str = "nodejs\\node-windows-x64.zip";
 const OPENCLAW_RESOURCE_RELATIVE_PATH: &str = "openclaw\\openclaw-zh.tgz";
 
 #[cfg(windows)]
+const OFFLINE_NPM_GLOBAL_ZIP_RELATIVE_PATH: &str = "offline\\npm-global.zip";
+
+#[cfg(windows)]
 const GIT_RESOURCE_CANDIDATES: &[&str] = &[
     "git\\git-windows-x64.zip",
     "git\\git-portable.zip",
@@ -317,6 +320,35 @@ fn ensure_windows_openclaw_package(runtime_root: &Path) -> io::Result<PathBuf> {
 fn ensure_windows_preinstalled_npm_prefix(runtime_root: &Path) -> io::Result<PathBuf> {
     let npm_prefix = runtime_root.join("npm-global");
     if npm_prefix.join("openclaw.cmd").exists() {
+        return Ok(npm_prefix);
+    }
+
+    if let Some(preinstalled_zip) = find_windows_resource_file(OFFLINE_NPM_GLOBAL_ZIP_RELATIVE_PATH)
+    {
+        let tmp_extract = runtime_root.join("tmp-offline-npm-global-extract");
+        if tmp_extract.exists() {
+            fs::remove_dir_all(&tmp_extract)?;
+        }
+        extract_zip(&preinstalled_zip, &tmp_extract)?;
+
+        let extracted_prefix = if tmp_extract.join("openclaw.cmd").exists() {
+            tmp_extract.clone()
+        } else if tmp_extract.join("npm-global").join("openclaw.cmd").exists() {
+            tmp_extract.join("npm-global")
+        } else if let Some(found) = find_top_level_dir_containing_file(&tmp_extract, "openclaw.cmd")
+        {
+            found
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "离线 npm-global zip 中未找到 openclaw.cmd",
+            ));
+        };
+
+        move_or_copy_dir(&extracted_prefix, &npm_prefix)?;
+        if tmp_extract.exists() {
+            let _ = fs::remove_dir_all(&tmp_extract);
+        }
         return Ok(npm_prefix);
     }
 
