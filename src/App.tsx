@@ -307,11 +307,7 @@ function App() {
         {/* 标题栏（macOS 拖拽区域） */}
         <Header
           currentPage={currentPage}
-          onOpenTerminal={
-            currentPage === 'dashboard' && envStatus && !envStatus.ready
-              ? handleOpenDebugTerminal
-              : undefined
-          }
+          onOpenTerminal={handleOpenDebugTerminal}
         />
         
         {/* 页面内容 */}

@@ -765,6 +765,7 @@ echo "git: ~/.openclaw-manager/runtime/git/bin/git"
 echo ""
 echo "[提示] 可继续手动执行命令排查问题。"
 echo ""
+exec $SHELL
 "#;
 
         let script_path = "/tmp/openclaw_debug_terminal.command";
@@ -808,7 +809,7 @@ echo "git: ~/.openclaw-manager/runtime/git/bin/git"
 echo ""
 echo "[提示] 可继续手动执行命令排查问题。"
 echo ""
-read -p "按回车键关闭..."
+exec $SHELL
 "#;
 
         let script_path = "/tmp/openclaw_debug_terminal.sh";
