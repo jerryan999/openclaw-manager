@@ -1019,9 +1019,9 @@ Write-Host ""
 Write-Host "[离线 Runtime 路径]" -ForegroundColor Yellow
 $rt = Join-Path $env:LOCALAPPDATA "OpenClawManager\runtime"
 Write-Host "runtime: $rt"
-Write-Host "node: $(Join-Path $rt 'node\node.exe')"
-Write-Host "openclaw: $(Join-Path $rt 'npm-global\openclaw.cmd')"
-Write-Host "git: $(Join-Path $rt 'git\cmd\git.exe')"
+Write-Host "node: $(Join-Path $rt ''node\node.exe'')"
+Write-Host "openclaw: $(Join-Path $rt ''npm-global\openclaw.cmd'')"
+Write-Host "git: $(Join-Path $rt ''git\cmd\git.exe'')"
 
 Write-Host ""
 Write-Host "[提示] 可继续手动执行命令排查问题。" -ForegroundColor Green
