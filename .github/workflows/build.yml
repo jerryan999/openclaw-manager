@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - dev
+  schedule:
+    # 每日 02:00 UTC 构建一次（不创建 Release，仅产出 artifacts）
+    - cron: "0 2 * * *"
   workflow_dispatch:
 
 jobs:

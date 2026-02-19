@@ -11,7 +11,6 @@ import {
   Cpu,
   Package,
   GitBranch,
-  Terminal,
 } from 'lucide-react';
 import { setupLogger } from '../../lib/logger';
 

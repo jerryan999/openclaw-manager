@@ -173,9 +173,28 @@ npm run tauri:dev
 npm run tauri:build
 ```
 
+### 版本号一键更新
+
+项目版本号分布在 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、`Makefile` 四处。使用脚本可一次改齐，无需手动改多处：
+
+```bash
+# 将版本号统一更新为 x.y.z（会修改上述 4 个文件）
+npm run version 0.0.26
+# 或
+npm run bump 0.0.26
+```
+
+版本号格式须为 `x.y.z`（如 `0.0.26`）。更新完成后，再提交并打 tag 推送即可：
+
+```bash
+git add -A && git commit -m "chore: bump version to 0.0.26"
+git tag -a v0.0.26 -m "Release v0.0.26"
+git push origin dev && git push origin v0.0.26
+```
+
 ### 使用 Makefile（推荐）
 
-项目提供了 Makefile 来简化常用操作，特别是版本发布流程：
+项目提供了 Makefile 来简化常用操作：
 
 ```bash
 # 查看所有可用命令
@@ -185,33 +204,12 @@ make help
 make install      # 安装依赖
 make dev          # 启动开发服务器
 make build        # 构建应用
-make check        # 检查 Rust 代码
-make fmt          # 格式化 Rust 代码
-
-# 版本发布流程
-# 1. 修改 Makefile 顶部的 TAG 变量（例如：TAG := 0.0.10）
-# 2. 执行完整发布流程
-make release      # 自动更新版本号 -> 提交 -> 创建 tag -> 推送
-
-# 或者在命令行直接指定版本
-make quick-release TAG=0.0.11
+make check        # 检查环境与资源
+make clean        # 清理构建产物
 
 # 其他实用命令
-make status       # 查看 git 状态
-make list-tags    # 列出所有 tags
-make rollback-tag # 删除当前 TAG（慎用）
-```
-
-**版本发布示例**：
-
-```bash
-# 修改 Makefile 中的 TAG 变量
-# TAG := 0.0.10
-
-# 执行发布（会自动更新所有版本号文件、提交、创建 tag、推送）
-make release
-
-# 🎉 完成！GitHub Actions 会自动构建并创建 Release
+make info         # 查看项目与资源状态
+make resources    # 下载打包所需资源（Node/OpenClaw 等）
 ```
 
 ## 📁 项目结构
