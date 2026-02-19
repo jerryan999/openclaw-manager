@@ -197,6 +197,21 @@ curl -L -o node-windows-x64.zip \
 
 ⚠️ 注意：打包 Node.js 会增加 ~50MB 体积，仅在必要时使用。
 
+## 🔧 故障排除
+
+### 报错：Cannot find package 'xxx'（如 ajv）
+
+**原因**：Windows 上 `npm install -g <tgz> --prefix` 有时不会把包的依赖正确装到 prefix 的 `node_modules`，导致运行时缺包。
+
+**当前 CI 做法**：在全局安装 openclaw-zh.tgz 后，再在已安装的包目录内执行 `npm install --omit=dev`，把 openclaw-zh 的**全部生产依赖**装进 `node_modules/@jerryan999/openclaw-zh/node_modules/`，避免漏装任意依赖。
+
+若你用的是旧版安装包仍报缺包，可重新安装新构建的版本；或有网络时在 PowerShell 手动补装（示例为 ajv）：
+
+```powershell
+$rt = "$env:LOCALAPPDATA\OpenClawManager\runtime"
+& "$rt\node\npm.cmd" install ajv --prefix "$rt\npm-global" --no-audit --loglevel=error
+```
+
 ## 📚 相关文档
 
 - [资源打包说明](../src-tauri/resources/README.md)
