@@ -1,6 +1,6 @@
 # Git 离线资源（仅 Windows）
 
-本目录用于存放 Windows 64 位 MinGit/Portable Git 的 **.zip** 包，供应用在无系统 Git 时使用。
+本目录用于存放 Windows 64 位 Git 的 **.zip** 包，供应用在无系统 Git 时使用。
 
 ## 如何添加
 
@@ -10,12 +10,13 @@
 .\download-resources.ps1
 ```
 
-会将 MinGit 下载为 `git-windows-x64.zip`。
+会优先将当前系统 Git 打包为 `git-portable.zip`。
 
-或从 [Git for Windows Releases](https://github.com/git-for-windows/git/releases) 下载 **MinGit-*-64-bit.zip**，放入本目录：
+或从 [Git for Windows Releases](https://github.com/git-for-windows/git/releases) 下载 Git zip 包，放入本目录：
 
-- **推荐命名**：`git-windows-x64.zip`（与 download 脚本一致）
-- 也可不重命名：本目录下任意 **.zip** 均会被识别为 Git 包（如 `MinGit-2.53.0-64-bit.zip`）
+- **推荐命名**：`git-portable.zip`（优先级最高）
+- 兼容命名：`PortableGit.zip`
+- 也可不重命名：本目录下任意 **.zip** 均会被识别为 Git 包
 
 ## 说明
 

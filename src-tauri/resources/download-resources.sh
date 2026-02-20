@@ -56,20 +56,27 @@ esac
 cd ..
 echo ""
 
-# 下载 Git（MinGit for Windows，供离线 Git 资源使用）
+# 准备 Git 资源（Windows 使用 git-portable.zip）
 echo "📦 下载 Git 资源..."
 cd git
 
 case "$OS-$ARCH" in
   msys_nt-*|mingw*|cygwin_nt-*|windows-*)
-    GIT_FILE="git-windows-x64.zip"
-    GIT_URL="https://github.com/git-for-windows/git/releases/download/v${GIT_VERSION}.windows.1/MinGit-${GIT_VERSION}-64-bit.zip"
-    echo "  - Windows x64 (MinGit)"
-    if [ ! -f "$GIT_FILE" ]; then
-      curl -L -o "$GIT_FILE" "$GIT_URL"
-      echo "  ✓ 下载完成: $GIT_FILE"
+    GIT_FILE="git-portable.zip"
+    echo "  - Windows x64 (portable)"
+    if command -v git >/dev/null 2>&1; then
+      GIT_EXE="$(command -v git)"
+      GIT_BIN_DIR="$(dirname "$GIT_EXE")"
+      GIT_ROOT="$(dirname "$GIT_BIN_DIR")"
+      if [ ! -f "$GIT_FILE" ]; then
+        (cd "$GIT_ROOT" && zip -r "$OLDPWD/$GIT_FILE" . >/dev/null)
+        echo "  ✓ 已打包当前系统 Git: $GIT_FILE"
+      else
+        echo "  ✓ 已存在: $GIT_FILE（跳过）"
+      fi
     else
-      echo "  ✓ 已存在: $GIT_FILE（跳过）"
+      echo "  ⚠️  未检测到系统 Git，无法自动生成 $GIT_FILE"
+      echo "  请手动放置 Git for Windows 的 .zip 到 src-tauri/resources/git/"
     fi
     ;;
   darwin-*|linux-*)
@@ -153,6 +160,6 @@ echo "  - 可以在 CI/CD 中运行此脚本自动下载"
 echo ""
 echo "📦 打包体积影响："
 echo "  - Node.js (每个平台): ~40-50MB"
-echo "  - MinGit (Windows): ~45-55MB"
+echo "  - Git portable (Windows): ~45-65MB"
 echo "  - OpenClaw .tgz: ~10-20MB"
 echo "  - 总计（含离线 Git）: ~90-125MB"

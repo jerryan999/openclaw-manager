@@ -29,9 +29,9 @@ const OFFLINE_NPM_GLOBAL_ZIP_RELATIVE_PATH: &str = "offline\\npm-global.zip";
 
 #[cfg(windows)]
 const GIT_RESOURCE_CANDIDATES: &[&str] = &[
-    "git\\git-windows-x64.zip",
     "git\\git-portable.zip",
     "git\\PortableGit.zip",
+    "git\\git-full-windows-x64.zip",
 ];
 
 #[derive(Debug, Clone)]
@@ -67,13 +67,16 @@ pub fn get_extended_path() -> String {
 
     #[cfg(windows)]
     {
+        // 优先确保打包 Git 已解压（不依赖 Node/OpenClaw 资源），便于在无系统 Git 时也可用
+        let _ = ensure_windows_git_if_bundled();
+
         if let Ok(runtime) = get_windows_offline_runtime() {
             paths.push(runtime.node_dir.display().to_string());
             paths.push(runtime.npm_prefix.display().to_string());
             if let Some(ref git_exe) = runtime.git_exe {
                 if let Some(cmd_dir) = git_exe.parent() {
                     paths.push(cmd_dir.display().to_string());
-                    // MinGit 的 DLL 在 mingw64/bin，需加入 PATH 才能正常启动 git.exe
+                    // Git for Windows 的 DLL 在 mingw64/bin，需加入 PATH 才能正常启动 git.exe
                     if let Some(git_root) = cmd_dir.parent() {
                         let mingw64_bin = git_root.join("mingw64").join("bin");
                         if mingw64_bin.exists() {
@@ -442,7 +445,7 @@ fn find_git_resource_zip() -> Option<PathBuf> {
             return Some(path);
         }
     }
-    // 兼容未重命名的 MinGit：在 resources/git 目录下任意 .zip 均视为 Git 包
+    // 兼容未重命名的 Git for Windows 压缩包：在 resources/git 目录下任意 .zip 均视为 Git 包
     if let Some(git_dir) = find_windows_resource_dir("git") {
         if let Ok(entries) = fs::read_dir(&git_dir) {
             for entry in entries.flatten() {
@@ -458,7 +461,7 @@ fn find_git_resource_zip() -> Option<PathBuf> {
             }
         }
         warn!(
-            "[资源] resources/git 目录下无 .zip 文件: {:?}（请将 MinGit 的 .zip 放入此目录）",
+            "[资源] resources/git 目录下无 .zip 文件: {:?}（请将 Git for Windows 的 .zip 放入此目录）",
             git_dir
         );
     } else {
@@ -475,7 +478,7 @@ fn find_git_executable(root: &Path) -> Option<PathBuf> {
     find_parent_dir_with_file(root, "git.exe").map(|p| p.join("git.exe"))
 }
 
-/// 填充 runtime\git：仅当存在打包的 Git zip（如 resources/git/git-windows-x64.zip）时才会解压。
+/// 填充 runtime\git：仅当存在打包的 Git zip（如 resources/git/git-portable.zip）时才会解压。
 /// 若未打包 Git 资源，本函数不会创建或写入 git 目录；若之前解压后内容被删，会留下空目录。
 #[cfg(windows)]
 fn ensure_windows_git_runtime(runtime_root: &Path) -> io::Result<Option<PathBuf>> {
@@ -510,7 +513,7 @@ fn ensure_windows_git_runtime(runtime_root: &Path) -> io::Result<Option<PathBuf>
     }
     extract_zip(&git_zip, &extract_root)?;
 
-    // MinGit zip 根目录含多个顶层项：cmd/git.exe、mingw64/（DLL 等）、usr/ 等，
+    // Git zip 根目录含多个顶层项：cmd/git.exe、mingw64/（DLL 等）、usr/ 等，
     // 只复制“含 git.exe 的目录”会缺依赖导致 "error launching git"，故需复制整棵解压树。
     let top_level: Vec<_> = fs::read_dir(&extract_root)?
         .filter_map(Result::ok)

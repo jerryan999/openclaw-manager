@@ -219,22 +219,7 @@ fn get_preferred_node_path() -> Option<String> {
 /// 获取 Git 版本
 fn get_git_version() -> Option<String> {
     if platform::is_windows() {
-        // Windows: 先尝试直接调用
-        if let Ok(v) = shell::run_cmd_output("git --version") {
-            if !v.is_empty() {
-                info!("[环境检查] 通过 cmd 找到 Git: {}", v.trim());
-                return Some(v.trim().to_string());
-            }
-        }
-        
-        if let Ok(v) = shell::run_powershell_output("git --version") {
-            if !v.is_empty() {
-                info!("[环境检查] 通过 PowerShell 找到 Git: {}", v.trim());
-                return Some(v.trim().to_string());
-            }
-        }
-
-        // 先尝试单独解压打包的 Git（不依赖完整 offline runtime，避免因无 Node zip 导致从不解压）
+        // Windows: 优先尝试打包的 Git（不依赖完整 offline runtime，避免要求先安装系统 Git）
         if let Some(ref git_exe) = shell::ensure_windows_git_if_bundled() {
             if git_exe.exists() {
                 let cmd = format!("\"{}\" --version", git_exe.display());
@@ -247,7 +232,7 @@ fn get_git_version() -> Option<String> {
             }
         }
 
-        // 离线 runtime 中的 Git（若完整 runtime 已就绪）
+        // 完整离线 runtime 中的 Git（若 Node/OpenClaw 资源也就绪）
         if let Ok(runtime) = shell::get_windows_offline_runtime() {
             if let Some(ref git_exe) = runtime.git_exe {
                 if git_exe.exists() {
@@ -259,6 +244,21 @@ fn get_git_version() -> Option<String> {
                         }
                     }
                 }
+            }
+        }
+
+        // 回退：系统 PATH 中的 Git
+        if let Ok(v) = shell::run_cmd_output("git --version") {
+            if !v.is_empty() {
+                info!("[环境检查] 通过 cmd 找到 Git: {}", v.trim());
+                return Some(v.trim().to_string());
+            }
+        }
+
+        if let Ok(v) = shell::run_powershell_output("git --version") {
+            if !v.is_empty() {
+                info!("[环境检查] 通过 PowerShell 找到 Git: {}", v.trim());
+                return Some(v.trim().to_string());
             }
         }
 
@@ -311,7 +311,7 @@ fn get_git_version() -> Option<String> {
             }
         };
         warn!(
-            "[环境检查] 未找到 Git。请安装 Git 或确保 src-tauri/resources/git/ 下有 MinGit 的 .zip（如 git-windows-x64.zip）。{}",
+            "[环境检查] 未找到 Git。请安装 Git 或确保 src-tauri/resources/git/ 下有 Git for Windows 的 .zip（如 git-portable.zip）。{}",
             reason
         );
         None
@@ -773,22 +773,17 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
         }
     }
 
-    // 回退：使用打包的离线包或在线安装（需 Git）
+    // 回退：使用打包的离线包或在线安装（在线模式需要 Git；可使用打包的 portable Git）
     let bundled_package = get_bundled_openclaw_package_with_app(app);
     if bundled_package.is_none() && get_git_version().is_none() {
         return Ok(InstallResult {
             success: false,
             message: "Git 未安装".to_string(),
             error: Some(
-                "在线安装 OpenClaw 需要 Git。\n\n两个解决方案：\n\
-                方案1（推荐）：使用打包离线包\n  \
-                - 下载包含 OpenClaw 离线包的完整版本\n  \
-                - 无需 Git，安装更快更可靠\n\n\
-                方案2：安装 Git\n  \
-                1. 访问 https://git-scm.com/download/win\n  \
-                2. 下载并安装 Git for Windows\n  \
-                3. 安装完成后重启本应用\n  \
-                或使用: winget install --id Git.Git -e --source winget"
+                "在线安装 OpenClaw 需要 Git。\n\n推荐解决方案（无需系统安装 Git）：\n\
+                1. 在 src-tauri/resources/git/ 放置 Git for Windows 的 zip（推荐名: git-portable.zip）\n\
+                2. 重新启动应用，应用会优先使用打包 Git\n\n\
+                兜底方案：安装系统 Git（Git for Windows）后重启应用。"
                     .to_string(),
             ),
         });
@@ -843,7 +838,8 @@ if (-not $nodeVersion) {
 $gitVersion = git --version 2>$null
 if (-not $gitVersion) {
     Write-Host "错误：在线安装需要 Git"
-    Write-Host "下载地址: https://git-scm.com/download/win"
+    Write-Host "请优先放置打包 Git：src-tauri/resources/git/git-portable.zip"
+    Write-Host "（也可安装系统 Git 作为兜底）"
     exit 1
 }
 
@@ -1082,14 +1078,14 @@ Write-Host ""
 function Show-Version($name) {
   $cmd = Get-Command $name -ErrorAction SilentlyContinue
   if (-not $cmd) {
-    Write-Host ("$name: NOT FOUND")
+    Write-Host ("${name}: NOT FOUND")
     return
   }
   $path = $cmd.Source
   $source = if ($path.StartsWith($rt, [System.StringComparison]::OrdinalIgnoreCase)) { "离线 runtime" } else { "系统/外部" }
   $version = (& $path --version 2>&1 | Select-Object -First 1)
   if (-not $version) { $version = "(无版本输出)" }
-  Write-Host ("$name: $version")
+  Write-Host ("${name}: $version")
   Write-Host ("  path: $path")
   Write-Host ("  source: $source")
 }

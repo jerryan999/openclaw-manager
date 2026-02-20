@@ -36,23 +36,30 @@ try {
 Set-Location ".."
 Write-Host ""
 
-# 下载 MinGit for Windows（可选，用于离线 Git）
-Write-Host "📦 下载 MinGit (Windows 64-bit)..."
+# 准备 Git for Windows 离线包（仅使用 portable Git）
+Write-Host "📦 准备 Git (Windows 64-bit, portable 优先)..."
 Set-Location "git"
-$GIT_VERSION = "2.53.0"
-$gitUrl = "https://github.com/git-for-windows/git/releases/download/v$GIT_VERSION.windows.1/MinGit-$GIT_VERSION-64-bit.zip"
-$gitFile = "git-windows-x64.zip"
-if (-not (Test-Path $gitFile)) {
-    try {
-        Write-Host "  从 $gitUrl 下载..."
-        Invoke-WebRequest -Uri $gitUrl -OutFile $gitFile -UseBasicParsing
-        Write-Host "  ✓ 下载完成: $gitFile"
-    } catch {
-        Write-Host "  ✗ 下载失败: $_"
-        Write-Host "  可手动从 https://github.com/git-for-windows/git/releases 下载 MinGit-*-64-bit.zip 并重命名为 $gitFile"
+$portableFile = "git-portable.zip"
+if (-not (Test-Path $portableFile)) {
+    $gitCmd = Get-Command git -ErrorAction SilentlyContinue
+    if ($gitCmd) {
+        try {
+            Write-Host "  发现系统 Git，正在打包为 $portableFile ..."
+            $gitExe = $gitCmd.Source
+            $gitRoot = Split-Path (Split-Path $gitExe -Parent) -Parent
+            Compress-Archive -Path "$gitRoot\*" -DestinationPath $portableFile -Force
+            Write-Host "  ✓ 已生成: $portableFile"
+        } catch {
+            Write-Host "  ✗ 打包系统 Git 失败: $_"
+        }
+    } else {
+        Write-Host "  ⚠️  当前系统未检测到 Git，无法自动生成 $portableFile"
+        Write-Host "  请手动放置 Git for Windows 的便携版 zip 到 src-tauri/resources/git/ 并命名为 $portableFile"
     }
-} else {
-    Write-Host "  ✓ 已存在: $gitFile（跳过）"
+}
+
+if (Test-Path $portableFile) {
+    Write-Host "  ✓ 已存在: $portableFile（跳过）"
 }
 Set-Location ".."
 Write-Host ""

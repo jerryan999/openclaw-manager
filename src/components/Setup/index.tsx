@@ -302,15 +302,12 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                     可选
                   </span>
                 ) : (
-                  <a
-                    href="https://git-scm.com/download/win"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-primary text-sm px-4 py-2 flex items-center gap-2"
+                  <span
+                    className="text-xs text-amber-300 px-3 py-2 bg-amber-500/10 rounded-lg border border-amber-500/30"
+                    title="在线安装需要 Git；优先使用打包的 git-portable.zip"
                   >
-                    <ExternalLink className="w-4 h-4" />
-                    下载
-                  </a>
+                    需要 Git（建议放置 git-portable.zip）
+                  </span>
                 )}
               </div>
             )}

@@ -11,8 +11,8 @@ resources/
 │   ├── macos-x64/    # macOS Intel
 │   ├── windows-x64/  # Windows 64位
 │   └── linux-x64/    # Linux 64位
-├── git/              # MinGit/Portable Git（仅 Windows，可选）
-│   └── git-windows-x64.zip   # 或 git-portable.zip、PortableGit.zip（须为 .zip）
+├── git/              # Portable Git（仅 Windows，可选）
+│   └── git-portable.zip      # 或 PortableGit.zip（须为 .zip）
 └── openclaw/         # OpenClaw npm 包（离线安装）
     └── openclaw-zh.tgz   # 打包的 npm 包
 ```
@@ -56,9 +56,9 @@ npm pack @jerryan999/openclaw-zh
 mv jerryan999-openclaw-zh-*.tgz openclaw-zh.tgz
 ```
 
-### 3. MinGit / Portable Git（可选，仅 Windows）
+### 3. Portable Git（可选，仅 Windows）
 
-如果不想要求用户安装 Git，可打包 MinGit（应用内仅支持 **.zip** 格式）：
+如果不想要求用户安装系统 Git，可打包 Portable Git（应用内仅支持 **.zip** 格式）：
 
 **方式一：用脚本下载（推荐）**
 
@@ -68,14 +68,13 @@ mv jerryan999-openclaw-zh-*.tgz openclaw-zh.tgz
 .\download-resources.ps1
 ```
 
-脚本会下载 MinGit 并保存为 `git/git-windows-x64.zip`。
+脚本会优先把当前系统 Git 打包为 `git/git-portable.zip`。
 
 **方式二：手动下载**
 
 1. 打开 https://github.com/git-for-windows/git/releases
-2. 下载 **MinGit-&lt;version&gt;-64-bit.zip**（约 10–15MB）
+2. 下载 Git for Windows 的便携版 zip（约 40–60MB）
 3. 放入 `src-tauri/resources/git/` 并命名为以下之一：
-   - `git-windows-x64.zip`
    - `git-portable.zip`
    - `PortableGit.zip`
 
