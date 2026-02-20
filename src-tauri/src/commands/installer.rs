@@ -59,12 +59,13 @@ pub async fn check_environment(app: tauri::AppHandle) -> Result<EnvironmentStatu
 
     // 检查 Node.js
     info!("[环境检查] 检查 Node.js...");
-    let node_version = get_node_version();
+    let node_path = get_preferred_node_path();
+    let node_version = get_node_version_from_path(node_path.as_deref());
     let node_installed = node_version.is_some();
     let node_version_ok = check_node_version_requirement(&node_version);
     info!(
-        "[环境检查] Node.js: installed={}, version={:?}, version_ok={}",
-        node_installed, node_version, node_version_ok
+        "[环境检查] Node.js: installed={}, version={:?}, version_ok={}, path={:?}",
+        node_installed, node_version, node_version_ok, node_path
     );
 
     // 检查打包的 Node.js
@@ -75,15 +76,28 @@ pub async fn check_environment(app: tauri::AppHandle) -> Result<EnvironmentStatu
     info!("[环境检查] 检查 Git...");
     let git_version = get_git_version();
     let git_installed = git_version.is_some();
-    info!("[环境检查] Git: installed={}, version={:?}", git_installed, git_version);
+    let git_path = if git_installed {
+        get_command_path("git")
+    } else {
+        None
+    };
+    info!(
+        "[环境检查] Git: installed={}, version={:?}, path={:?}",
+        git_installed, git_version, git_path
+    );
 
     // 检查 OpenClaw
     info!("[环境检查] 检查 OpenClaw...");
     let openclaw_version = get_openclaw_version();
     let openclaw_installed = openclaw_version.is_some();
+    let openclaw_path = if openclaw_installed {
+        shell::get_openclaw_path()
+    } else {
+        None
+    };
     info!(
-        "[环境检查] OpenClaw: installed={}, version={:?}",
-        openclaw_installed, openclaw_version
+        "[环境检查] OpenClaw: installed={}, version={:?}, path={:?}",
+        openclaw_installed, openclaw_version, openclaw_path
     );
 
     // 检查配置目录
@@ -137,59 +151,67 @@ pub async fn check_environment(app: tauri::AppHandle) -> Result<EnvironmentStatu
 
 /// 获取 Node.js 版本
 /// 检测多个可能的安装路径，因为 GUI 应用不继承用户 shell 的 PATH
-fn get_node_version() -> Option<String> {
+fn get_node_version_from_path(node_path: Option<&str>) -> Option<String> {
+    let Some(path) = node_path else {
+        return None;
+    };
+    if let Ok(v) = shell::run_command_output(path, &["--version"]) {
+        let version = v.trim().to_string();
+        if !version.is_empty() && version.starts_with('v') {
+            return Some(version);
+        }
+    }
+    None
+}
+
+fn get_preferred_node_path() -> Option<String> {
     if platform::is_windows() {
-        // Windows: 先尝试直接调用（如果 PATH 已更新）
-        if let Ok(v) = shell::run_cmd_output("node --version") {
-            let version = v.trim().to_string();
-            if !version.is_empty() && version.starts_with('v') {
-                info!("[环境检查] 通过 PATH 找到 Node.js: {}", version);
-                return Some(version);
+        if let Ok(runtime) = shell::get_windows_offline_runtime() {
+            let node_exe = runtime.node_dir.join("node.exe");
+            if node_exe.exists() {
+                return Some(node_exe.display().to_string());
             }
         }
 
-        // Windows: 检查常见的安装路径
-        let possible_paths = get_windows_node_paths();
-        for path in possible_paths {
+        for path in get_windows_node_paths() {
             if std::path::Path::new(&path).exists() {
-                // 使用完整路径执行
-                let cmd = format!("\"{}\" --version", path);
-                if let Ok(output) = shell::run_cmd_output(&cmd) {
-                    let version = output.trim().to_string();
-                    if !version.is_empty() && version.starts_with('v') {
-                        info!("[环境检查] 在 {} 找到 Node.js: {}", path, version);
-                        return Some(version);
-                    }
-                }
+                return Some(path);
             }
         }
 
+        if let Ok(output) = shell::run_cmd_output("where node") {
+            if let Some(path) = output.lines().map(str::trim).find(|line| !line.is_empty()) {
+                return Some(path.to_string());
+            }
+        }
         None
     } else {
-        // 先尝试直接调用
-        if let Ok(v) = shell::run_command_output("node", &["--version"]) {
-            return Some(v.trim().to_string());
+        let mut runtime_candidates: Vec<String> = Vec::new();
+        if let Some(home) = dirs::home_dir() {
+            let home_str = home.display().to_string();
+            runtime_candidates.push(format!("{}/.openclaw-manager/runtime/node/bin/node", home_str));
+            runtime_candidates.push(format!("{}/.openclaw-manager/runtime/node/node", home_str));
         }
-
-        // 检测常见的 Node.js 安装路径（macOS/Linux）
-        let possible_paths = get_unix_node_paths();
-        for path in possible_paths {
+        for path in runtime_candidates {
             if std::path::Path::new(&path).exists() {
-                if let Ok(output) = shell::run_command_output(&path, &["--version"]) {
-                    info!("[环境检查] 在 {} 找到 Node.js: {}", path, output.trim());
-                    return Some(output.trim().to_string());
-                }
+                return Some(path);
             }
         }
 
-        // 尝试通过 shell 加载用户环境来检测
-        if let Ok(output) = shell::run_bash_output("source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null; node --version 2>/dev/null") {
-            if !output.is_empty() && output.starts_with('v') {
-                info!("[环境检查] 通过用户 shell 找到 Node.js: {}", output.trim());
-                return Some(output.trim().to_string());
+        for path in get_unix_node_paths() {
+            if std::path::Path::new(&path).exists() {
+                return Some(path);
             }
         }
 
+        if let Ok(path) = shell::run_bash_output(
+            "source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null; command -v node 2>/dev/null",
+        ) {
+            let path = path.trim();
+            if !path.is_empty() {
+                return Some(path.to_string());
+            }
+        }
         None
     }
 }
@@ -309,6 +331,12 @@ fn get_git_version() -> Option<String> {
 /// 获取 Unix 系统上可能的 Node.js 路径
 fn get_unix_node_paths() -> Vec<String> {
     let mut paths = Vec::new();
+
+    if let Some(home) = dirs::home_dir() {
+        let home_str = home.display().to_string();
+        paths.push(format!("{}/.openclaw-manager/runtime/node/bin/node", home_str));
+        paths.push(format!("{}/.openclaw-manager/runtime/node/node", home_str));
+    }
 
     // Homebrew (macOS)
     paths.push("/opt/homebrew/bin/node".to_string()); // Apple Silicon
@@ -1031,38 +1059,55 @@ pub async fn open_debug_terminal() -> Result<String, String> {
             .unwrap_or_else(|| std::path::PathBuf::from("C:\\OpenClawManager\\runtime"))
             .display()
             .to_string();
-        let script_body = format!(
-            r#"$rt = "{0}"
+        let script_body = r#"$rt = "__RUNTIME_PATH__"
 $p1 = [IO.Path]::Combine($rt,'node'); $p2 = [IO.Path]::Combine($rt,'npm-global'); $p3 = [IO.Path]::Combine($rt,'git','cmd'); $p4 = [IO.Path]::Combine($rt,'git','mingw64','bin'); $env:PATH = "$p1;$p2;$p3;$p4;$env:PATH"
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "    OpenClaw 诊断终端" -ForegroundColor White
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "[当前运行时]" -ForegroundColor Cyan
-Write-Host "  离线 - 本窗口 PATH 已包含 runtime，以下 node/npm/git/openclaw 均使用离线版本"
+Write-Host "  优先离线 runtime；若离线不存在则回退系统/外部环境"
 Write-Host ""
 Write-Host "[离线 Runtime 路径]" -ForegroundColor Yellow
 Write-Host "runtime: $rt"
-Write-Host ("node: " + [IO.Path]::Combine($rt,'node','node.exe'))
-Write-Host ("openclaw: " + [IO.Path]::Combine($rt,'npm-global','openclaw.cmd'))
-Write-Host ("git: " + [IO.Path]::Combine($rt,'git','cmd','git.exe'))
+Write-Host ("node(runtime): " + [IO.Path]::Combine($rt,'node','node.exe'))
+Write-Host ("npm(runtime): " + [IO.Path]::Combine($rt,'node','npm.cmd'))
+Write-Host ("openclaw(runtime): " + [IO.Path]::Combine($rt,'npm-global','openclaw.cmd'))
+Write-Host ("git(runtime): " + [IO.Path]::Combine($rt,'git','cmd','git.exe'))
+Write-Host ("node(runtime exists): " + (Test-Path ([IO.Path]::Combine($rt,'node','node.exe'))))
+Write-Host ("npm(runtime exists): " + (Test-Path ([IO.Path]::Combine($rt,'node','npm.cmd'))))
+Write-Host ("openclaw(runtime exists): " + (Test-Path ([IO.Path]::Combine($rt,'npm-global','openclaw.cmd'))))
+Write-Host ("git(runtime exists): " + (Test-Path ([IO.Path]::Combine($rt,'git','cmd','git.exe'))))
 Write-Host ""
+function Show-Version($name) {
+  $cmd = Get-Command $name -ErrorAction SilentlyContinue
+  if (-not $cmd) {
+    Write-Host ("$name: NOT FOUND")
+    return
+  }
+  $path = $cmd.Source
+  $source = if ($path.StartsWith($rt, [System.StringComparison]::OrdinalIgnoreCase)) { "离线 runtime" } else { "系统/外部" }
+  $version = (& $path --version 2>&1 | Select-Object -First 1)
+  if (-not $version) { $version = "(无版本输出)" }
+  Write-Host ("$name: $version")
+  Write-Host ("  path: $path")
+  Write-Host ("  source: $source")
+}
 Write-Host "[版本检测]" -ForegroundColor Yellow
-node --version
-npm --version
-git --version
-openclaw --version
+Show-Version "node"
+Show-Version "npm"
+Show-Version "git"
+Show-Version "openclaw"
 Write-Host ""
 Write-Host "[路径检测]" -ForegroundColor Yellow
-where node
-where npm
-where git
-where openclaw
+Get-Command node -All -ErrorAction SilentlyContinue | ForEach-Object { $_.Source }
+Get-Command npm -All -ErrorAction SilentlyContinue | ForEach-Object { $_.Source }
+Get-Command git -All -ErrorAction SilentlyContinue | ForEach-Object { $_.Source }
+Get-Command openclaw -All -ErrorAction SilentlyContinue | ForEach-Object { $_.Source }
 Write-Host ""
 Write-Host "[提示] 可继续手动执行命令排查问题。" -ForegroundColor Green
-"#,
-            rt_path.replace('"', "`\"")
-        );
+"#
+        .replace("__RUNTIME_PATH__", &rt_path.replace('"', "`\""));
         let tmp = std::env::temp_dir().join("openclaw_debug_terminal.ps1");
         std::fs::write(&tmp, &script_body).map_err(|e| format!("写入脚本失败: {}", e))?;
         // 直接用 Command 启动 powershell -File <path>，避免通过 -Command 传参导致的路径/引号解析问题
@@ -1076,35 +1121,113 @@ Write-Host "[提示] 可继续手动执行命令排查问题。" -ForegroundColo
         let script_content = r#"#!/bin/bash
 clear
 RUNTIME="${HOME}/.openclaw-manager/runtime"
-export PATH="$RUNTIME/node/bin:$RUNTIME/npm-global/bin:$RUNTIME/git/bin:$PATH"
+prepend_path_if_dir() {
+  [ -d "$1" ] && PATH="$1:$PATH"
+}
+apply_runtime_priority_path() {
+  prepend_path_if_dir "$RUNTIME/node/bin"
+  prepend_path_if_dir "$RUNTIME/node"
+  prepend_path_if_dir "$RUNTIME/npm-global/bin"
+  prepend_path_if_dir "$RUNTIME/npm-global"
+  prepend_path_if_dir "$RUNTIME/git/bin"
+  prepend_path_if_dir "$RUNTIME/git/cmd"
+  prepend_path_if_dir "$RUNTIME/git/mingw64/bin"
+}
+apply_runtime_priority_path
+[ -f "$HOME/.zshrc" ] && source "$HOME/.zshrc" >/dev/null 2>&1 || true
+[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" >/dev/null 2>&1 || true
+apply_runtime_priority_path
+export PATH
 echo "========================================"
 echo "    OpenClaw 诊断终端"
 echo "========================================"
 echo ""
 echo "[当前运行时]"
-echo "  离线 - 本窗口 PATH 已包含 runtime，以下命令将使用离线版本"
+echo "  优先离线 runtime；若离线不存在则回退系统/用户 shell 环境"
 echo ""
 echo "[离线 Runtime 路径]"
 echo "runtime: $RUNTIME"
-echo "node: $RUNTIME/node/node"
-echo "openclaw: $RUNTIME/npm-global/openclaw"
-echo "git: $RUNTIME/git/bin/git"
+echo "node(runtime): $RUNTIME/node/bin/node"
+echo "npm(runtime): $RUNTIME/node/bin/npm"
+echo "openclaw(runtime): $RUNTIME/npm-global/bin/openclaw"
+echo "git(runtime): $RUNTIME/git/bin/git"
+echo "node(runtime exists): $(test -x "$RUNTIME/node/bin/node" && echo yes || echo no)"
+echo "npm(runtime exists): $(test -x "$RUNTIME/node/bin/npm" && echo yes || echo no)"
+echo "openclaw(runtime exists): $(test -x "$RUNTIME/npm-global/bin/openclaw" && echo yes || echo no)"
+echo "git(runtime exists): $(test -x "$RUNTIME/git/bin/git" && echo yes || echo no)"
 echo ""
+show_version() {
+  local name="$1"
+  local path source version shell_path shell_dir candidate
+  path="$(command -v "$name" 2>/dev/null || true)"
+  source="系统/外部"
+  case "$path" in
+    "$RUNTIME"/*) source="离线 runtime" ;;
+  esac
+  if [ -z "$path" ]; then
+    for candidate in "$HOME/.nvm/versions/node/"*/bin/"$name" "$HOME/.npm-global/bin/$name" "/opt/homebrew/bin/$name" "/usr/local/bin/$name" "/usr/bin/$name"; do
+      if [ -x "$candidate" ]; then
+        path="$candidate"
+        shell_dir="$(dirname "$candidate")"
+        PATH="$shell_dir:$PATH"
+        export PATH
+        source="系统路径兜底"
+        break
+      fi
+    done
+  fi
+  if [ -z "$path" ]; then
+    shell_path="$(zsh -lc "command -v $name" 2>/dev/null | head -n 1 || true)"
+    [ -z "$shell_path" ] && shell_path="$(bash -lc "command -v $name" 2>/dev/null | head -n 1 || true)"
+    if [ -n "$shell_path" ] && [ -x "$shell_path" ]; then
+      path="$shell_path"
+      shell_dir="$(dirname "$shell_path")"
+      PATH="$shell_dir:$PATH"
+      export PATH
+      source="用户 shell 兜底"
+    else
+      echo "$name: NOT FOUND (当前诊断终端 PATH)"
+      if [ -n "$shell_path" ]; then
+        echo "  user-shell-path: $shell_path"
+      fi
+      return
+    fi
+  fi
+  if [ "$name" = "npm" ]; then
+    version="$("$path" -v 2>/dev/null | head -n 1)"
+  else
+    version="$("$path" --version 2>&1 | head -n 1)"
+  fi
+  [ -z "$version" ] && version="(无版本输出)"
+  echo "$name: $version"
+  echo "  path: $path"
+  echo "  source: $source"
+}
 echo "[版本检测]"
-node --version
-npm --version
-git --version
-openclaw --version
+show_version node
+show_version npm
+show_version git
+show_version openclaw
 echo ""
 echo "[路径检测]"
-which node
-which npm
-which git
-which openclaw
+type -a node 2>/dev/null || true
+type -a npm 2>/dev/null || true
+type -a git 2>/dev/null || true
+type -a openclaw 2>/dev/null || true
 echo ""
 echo "[提示] 可继续手动执行命令排查问题。"
 echo ""
-exec $SHELL
+unset npm_config_prefix NPM_CONFIG_PREFIX
+export NO_COLOR=1
+enter_shell_keep_path() {
+  local sh="${SHELL:-/bin/bash}"
+  case "$(basename "$sh")" in
+    zsh) exec "$sh" -f -i ;;
+    bash) exec "$sh" --noprofile --norc -i ;;
+    *) exec "$sh" -i ;;
+  esac
+}
+enter_shell_keep_path
 "#;
 
         let script_path = "/tmp/openclaw_debug_terminal.command";
@@ -1125,35 +1248,113 @@ exec $SHELL
         let script_content = r#"#!/bin/bash
 clear
 RUNTIME="${HOME}/.openclaw-manager/runtime"
-export PATH="$RUNTIME/node/bin:$RUNTIME/npm-global/bin:$RUNTIME/git/bin:$PATH"
+prepend_path_if_dir() {
+  [ -d "$1" ] && PATH="$1:$PATH"
+}
+apply_runtime_priority_path() {
+  prepend_path_if_dir "$RUNTIME/node/bin"
+  prepend_path_if_dir "$RUNTIME/node"
+  prepend_path_if_dir "$RUNTIME/npm-global/bin"
+  prepend_path_if_dir "$RUNTIME/npm-global"
+  prepend_path_if_dir "$RUNTIME/git/bin"
+  prepend_path_if_dir "$RUNTIME/git/cmd"
+  prepend_path_if_dir "$RUNTIME/git/mingw64/bin"
+}
+apply_runtime_priority_path
+[ -f "$HOME/.zshrc" ] && source "$HOME/.zshrc" >/dev/null 2>&1 || true
+[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" >/dev/null 2>&1 || true
+apply_runtime_priority_path
+export PATH
 echo "========================================"
 echo "    OpenClaw 诊断终端"
 echo "========================================"
 echo ""
 echo "[当前运行时]"
-echo "  离线 - 本窗口 PATH 已包含 runtime，以下命令将使用离线版本"
+echo "  优先离线 runtime；若离线不存在则回退系统/用户 shell 环境"
 echo ""
 echo "[离线 Runtime 路径]"
 echo "runtime: $RUNTIME"
-echo "node: $RUNTIME/node/node"
-echo "openclaw: $RUNTIME/npm-global/openclaw"
-echo "git: $RUNTIME/git/bin/git"
+echo "node(runtime): $RUNTIME/node/bin/node"
+echo "npm(runtime): $RUNTIME/node/bin/npm"
+echo "openclaw(runtime): $RUNTIME/npm-global/bin/openclaw"
+echo "git(runtime): $RUNTIME/git/bin/git"
+echo "node(runtime exists): $(test -x "$RUNTIME/node/bin/node" && echo yes || echo no)"
+echo "npm(runtime exists): $(test -x "$RUNTIME/node/bin/npm" && echo yes || echo no)"
+echo "openclaw(runtime exists): $(test -x "$RUNTIME/npm-global/bin/openclaw" && echo yes || echo no)"
+echo "git(runtime exists): $(test -x "$RUNTIME/git/bin/git" && echo yes || echo no)"
 echo ""
+show_version() {
+  local name="$1"
+  local path source version shell_path shell_dir candidate
+  path="$(command -v "$name" 2>/dev/null || true)"
+  source="系统/外部"
+  case "$path" in
+    "$RUNTIME"/*) source="离线 runtime" ;;
+  esac
+  if [ -z "$path" ]; then
+    for candidate in "$HOME/.nvm/versions/node/"*/bin/"$name" "$HOME/.npm-global/bin/$name" "/opt/homebrew/bin/$name" "/usr/local/bin/$name" "/usr/bin/$name"; do
+      if [ -x "$candidate" ]; then
+        path="$candidate"
+        shell_dir="$(dirname "$candidate")"
+        PATH="$shell_dir:$PATH"
+        export PATH
+        source="系统路径兜底"
+        break
+      fi
+    done
+  fi
+  if [ -z "$path" ]; then
+    shell_path="$(zsh -lc "command -v $name" 2>/dev/null | head -n 1 || true)"
+    [ -z "$shell_path" ] && shell_path="$(bash -lc "command -v $name" 2>/dev/null | head -n 1 || true)"
+    if [ -n "$shell_path" ] && [ -x "$shell_path" ]; then
+      path="$shell_path"
+      shell_dir="$(dirname "$shell_path")"
+      PATH="$shell_dir:$PATH"
+      export PATH
+      source="用户 shell 兜底"
+    else
+      echo "$name: NOT FOUND (当前诊断终端 PATH)"
+      if [ -n "$shell_path" ]; then
+        echo "  user-shell-path: $shell_path"
+      fi
+      return
+    fi
+  fi
+  if [ "$name" = "npm" ]; then
+    version="$("$path" -v 2>/dev/null | head -n 1)"
+  else
+    version="$("$path" --version 2>&1 | head -n 1)"
+  fi
+  [ -z "$version" ] && version="(无版本输出)"
+  echo "$name: $version"
+  echo "  path: $path"
+  echo "  source: $source"
+}
 echo "[版本检测]"
-node --version
-npm --version
-git --version
-openclaw --version
+show_version node
+show_version npm
+show_version git
+show_version openclaw
 echo ""
 echo "[路径检测]"
-which node
-which npm
-which git
-which openclaw
+type -a node 2>/dev/null || true
+type -a npm 2>/dev/null || true
+type -a git 2>/dev/null || true
+type -a openclaw 2>/dev/null || true
 echo ""
 echo "[提示] 可继续手动执行命令排查问题。"
 echo ""
-exec $SHELL
+unset npm_config_prefix NPM_CONFIG_PREFIX
+export NO_COLOR=1
+enter_shell_keep_path() {
+  local sh="${SHELL:-/bin/bash}"
+  case "$(basename "$sh")" in
+    zsh) exec "$sh" -f -i ;;
+    bash) exec "$sh" --noprofile --norc -i ;;
+    *) exec "$sh" -i ;;
+  esac
+}
+enter_shell_keep_path
 "#;
 
         let script_path = "/tmp/openclaw_debug_terminal.sh";
@@ -1610,20 +1811,34 @@ fn get_latest_openclaw_version() -> Option<String> {
     }
 }
 
+fn get_command_path(cmd: &str) -> Option<String> {
+    if platform::is_windows() {
+        let query = format!("where {}", cmd);
+        if let Ok(output) = shell::run_cmd_output(&query) {
+            return output
+                .lines()
+                .map(str::trim)
+                .find(|line| !line.is_empty())
+                .map(|line| line.to_string());
+        }
+        None
+    } else {
+        shell::run_command_output("which", &[cmd])
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    }
+}
+
 /// 比较版本号，返回是否有更新可用
 /// current: 当前版本 (如 "1.0.0" 或 "v1.0.0")
 /// latest: 最新版本 (如 "1.0.1")
 fn compare_versions(current: &str, latest: &str) -> bool {
-    // 移除可能的 'v' 前缀和空白
-    let current = current.trim().trim_start_matches('v');
-    let latest = latest.trim().trim_start_matches('v');
+    let current_parts = extract_numeric_parts(current);
+    let latest_parts = extract_numeric_parts(latest);
+    let max_len = current_parts.len().max(latest_parts.len());
 
-    // 分割版本号
-    let current_parts: Vec<u32> = current.split('.').filter_map(|s| s.parse().ok()).collect();
-    let latest_parts: Vec<u32> = latest.split('.').filter_map(|s| s.parse().ok()).collect();
-
-    // 比较每个部分
-    for i in 0..3 {
+    for i in 0..max_len {
         let c = current_parts.get(i).unwrap_or(&0);
         let l = latest_parts.get(i).unwrap_or(&0);
         if l > c {
@@ -1634,6 +1849,28 @@ fn compare_versions(current: &str, latest: &str) -> bool {
     }
 
     false
+}
+
+fn extract_numeric_parts(version: &str) -> Vec<u32> {
+    let mut parts = Vec::new();
+    let mut buf = String::new();
+    let version = version.trim().trim_start_matches('v');
+    for ch in version.chars() {
+        if ch.is_ascii_digit() {
+            buf.push(ch);
+        } else if !buf.is_empty() {
+            if let Ok(n) = buf.parse::<u32>() {
+                parts.push(n);
+            }
+            buf.clear();
+        }
+    }
+    if !buf.is_empty() {
+        if let Ok(n) = buf.parse::<u32>() {
+            parts.push(n);
+        }
+    }
+    parts
 }
 
 fn openclaw_channel_file() -> std::path::PathBuf {

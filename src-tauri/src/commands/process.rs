@@ -74,14 +74,16 @@ pub async fn check_port_in_use(port: u16) -> Result<bool, String> {
 #[command]
 pub async fn get_node_version() -> Result<Option<String>, String> {
     info!("[进程检查] 获取 Node.js 版本...");
-    if !shell::command_exists("node") {
+    let node_path = get_preferred_node_path();
+    if node_path.is_none() {
         info!("[进程检查] Node.js 未安装");
         return Ok(None);
     }
 
-    match shell::run_command_output("node", &["--version"]) {
+    let node_path = node_path.unwrap();
+    match shell::run_command_output(&node_path, &["--version"]) {
         Ok(version) => {
-            info!("[进程检查] Node.js 版本: {}", version);
+            info!("[进程检查] Node.js 版本: {}, path={}", version, node_path);
             Ok(Some(version))
         }
         Err(e) => {
@@ -89,4 +91,34 @@ pub async fn get_node_version() -> Result<Option<String>, String> {
             Ok(None)
         }
     }
+}
+
+fn get_preferred_node_path() -> Option<String> {
+    if cfg!(windows) {
+        if let Ok(output) = shell::run_cmd_output("where node") {
+            if let Some(path) = output.lines().map(str::trim).find(|line| !line.is_empty()) {
+                return Some(path.to_string());
+            }
+        }
+        return None;
+    }
+
+    if let Some(home) = dirs::home_dir() {
+        let home_str = home.display().to_string();
+        let runtime_candidates = vec![
+            format!("{}/.openclaw-manager/runtime/node/bin/node", home_str),
+            format!("{}/.openclaw-manager/runtime/node/node", home_str),
+        ];
+        for p in runtime_candidates {
+            if std::path::Path::new(&p).exists() {
+                return Some(p);
+            }
+        }
+    }
+
+    if shell::command_exists("node") {
+        return Some("node".to_string());
+    }
+
+    None
 }

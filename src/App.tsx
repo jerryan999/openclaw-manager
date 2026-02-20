@@ -15,6 +15,8 @@ import { Download, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
 export type PageType = 'dashboard' | 'ai' | 'channels' | 'testing' | 'logs' | 'settings';
 
+let hasBootEnvironmentChecked = false;
+
 export interface EnvironmentStatus {
   node_installed: boolean;
   node_version: string | null;
@@ -124,6 +126,11 @@ function App() {
   };
 
   useEffect(() => {
+    if (hasBootEnvironmentChecked) {
+      appLogger.info('跳过重复的环境检查触发');
+      return;
+    }
+    hasBootEnvironmentChecked = true;
     appLogger.info('🦞 App 组件已挂载');
     checkEnvironment();
   }, [checkEnvironment]);

@@ -568,6 +568,11 @@ pub fn get_git_bundled_failure_reason() -> Option<String> {
     Some(format!("未找到 resources/git 目录，已尝试 roots: {:?}", roots))
 }
 
+#[cfg(not(windows))]
+pub fn get_git_bundled_failure_reason() -> Option<String> {
+    None
+}
+
 /// 仅解压并返回打包的 Git（不依赖 Node/OpenClaw 是否就绪）。
 /// 当未打包 Node 时 get_windows_offline_runtime() 会失败，导致 Git 从未被解压；此函数可单独触发 Git 解压。
 #[cfg(windows)]
@@ -584,6 +589,11 @@ pub fn ensure_windows_git_if_bundled() -> Option<PathBuf> {
             None
         }
     }
+}
+
+#[cfg(not(windows))]
+pub fn ensure_windows_git_if_bundled() -> Option<PathBuf> {
+    None
 }
 
 #[cfg(windows)]
@@ -609,6 +619,11 @@ pub fn get_windows_offline_runtime() -> Result<WindowsOfflineRuntime, String> {
         openclaw_package,
         git_exe,
     })
+}
+
+#[cfg(not(windows))]
+pub fn get_windows_offline_runtime() -> Result<WindowsOfflineRuntime, String> {
+    Err("Windows offline runtime is only available on Windows".to_string())
 }
 
 /// 执行 Shell 命令（带扩展 PATH）
