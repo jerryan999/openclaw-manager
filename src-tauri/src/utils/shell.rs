@@ -6,6 +6,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::{Mutex, OnceLock};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -40,6 +41,23 @@ pub struct WindowsOfflineRuntime {
     pub openclaw_cmd: PathBuf,
     pub openclaw_package: PathBuf,
     pub git_exe: Option<PathBuf>,
+}
+
+static OPENCLAW_PATH_LOGGED: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+
+fn log_openclaw_path_once(path: &str, offline_runtime: bool) {
+    let lock = OPENCLAW_PATH_LOGGED.get_or_init(|| Mutex::new(None));
+    if let Ok(mut last) = lock.lock() {
+        if last.as_deref() == Some(path) {
+            return;
+        }
+        *last = Some(path.to_string());
+    }
+    if offline_runtime {
+        info!("[Shell] 使用离线 runtime 中的 openclaw: {}", path);
+    } else {
+        info!("[Shell] 在 {} 找到 openclaw", path);
+    }
 }
 
 /// 获取扩展的 PATH 环境变量
@@ -848,18 +866,16 @@ pub fn get_openclaw_path() -> Option<String> {
         #[cfg(windows)]
         if let Ok(runtime) = get_windows_offline_runtime() {
             if runtime.openclaw_cmd.exists() {
-                info!(
-                    "[Shell] 使用离线 runtime 中的 openclaw: {}",
-                    runtime.openclaw_cmd.display()
-                );
-                return Some(runtime.openclaw_cmd.display().to_string());
+                let path = runtime.openclaw_cmd.display().to_string();
+                log_openclaw_path_once(&path, true);
+                return Some(path);
             }
         }
 
         let possible_paths = get_windows_openclaw_paths();
         for path in possible_paths {
             if std::path::Path::new(&path).exists() {
-                info!("[Shell] 在 {} 找到 openclaw", path);
+                log_openclaw_path_once(&path, false);
                 return Some(path);
             }
         }
@@ -868,7 +884,7 @@ pub fn get_openclaw_path() -> Option<String> {
         let possible_paths = get_unix_openclaw_paths();
         for path in possible_paths {
             if std::path::Path::new(&path).exists() {
-                info!("[Shell] 在 {} 找到 openclaw", path);
+                log_openclaw_path_once(&path, false);
                 return Some(path);
             }
         }
