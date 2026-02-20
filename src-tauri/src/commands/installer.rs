@@ -737,6 +737,7 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
         .join("node_modules")
         .join(".bin")
         .join("openclaw.cmd");
+    let mut runtime_attempt_error: Option<String> = None;
 
     // 优先使用 Windows 离线运行时（打包的 Node + OpenClaw 包）
     if let Ok(runtime) = shell::get_windows_offline_runtime() {
@@ -750,48 +751,39 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
 
         let npm_cmd = runtime.node_dir.join("npm.cmd");
         if !npm_cmd.exists() {
-            return Ok(InstallResult {
-                success: false,
-                message: "OpenClaw 安装失败".to_string(),
-                error: Some("离线 Node.js 运行时不完整：缺少 npm.cmd".to_string()),
-            });
-        }
-        let install_cmd = format!(
-            "\"{}\" install -g \"{}\" --prefix \"{}\" --no-audit --fund=false --loglevel=error",
-            npm_cmd.display(),
-            runtime.openclaw_package.display(),
-            runtime.npm_prefix.display()
-        );
-        match shell::run_cmd_output(&install_cmd) {
-            Ok(_) => {
-                if runtime.openclaw_cmd.exists()
-                    || runtime_openclaw_cmd_bin.exists()
-                    || get_openclaw_version().is_some()
-                {
-                    return Ok(InstallResult {
-                        success: true,
-                        message: "OpenClaw 离线安装成功！".to_string(),
-                        error: None,
-                    });
-                }
-                return Ok(InstallResult {
-                    success: false,
-                    message: "OpenClaw 安装失败".to_string(),
-                    error: Some(format!(
-                        "安装命令执行成功，但未找到 openclaw.cmd（已检查: {}, {}）",
+            runtime_attempt_error = Some("离线 Node.js 运行时不完整：缺少 npm.cmd".to_string());
+        } else {
+            let install_cmd = format!(
+                "\"{}\" install -g \"{}\" --prefix \"{}\" --no-audit --fund=false --loglevel=error",
+                npm_cmd.display(),
+                runtime.openclaw_package.display(),
+                runtime.npm_prefix.display()
+            );
+            match shell::run_cmd_output(&install_cmd) {
+                Ok(_) => {
+                    if runtime.openclaw_cmd.exists() || runtime_openclaw_cmd_bin.exists() {
+                        return Ok(InstallResult {
+                            success: true,
+                            message: "OpenClaw 离线安装成功！".to_string(),
+                            error: None,
+                        });
+                    }
+                    runtime_attempt_error = Some(format!(
+                        "离线安装命令执行成功，但未找到 openclaw.cmd（已检查: {}, {}）",
                         runtime.openclaw_cmd.display(),
                         runtime_openclaw_cmd_bin.display()
-                    )),
-                });
-            }
-            Err(e) => {
-                return Ok(InstallResult {
-                    success: false,
-                    message: "OpenClaw 安装失败".to_string(),
-                    error: Some(e),
-                });
+                    ));
+                }
+                Err(e) => {
+                    runtime_attempt_error = Some(format!("离线 runtime 安装失败: {}", e));
+                }
             }
         }
+
+        warn!(
+            "[安装OpenClaw] runtime 离线安装未完成，自动回退到 offline package 安装流程: {:?}",
+            runtime_attempt_error
+        );
     }
 
     // 回退：使用打包的离线包或在线安装（在线模式需要 Git；可使用打包的 portable Git）
@@ -801,11 +793,14 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
             success: false,
             message: "Git 未安装".to_string(),
             error: Some(
-                "在线安装 OpenClaw 需要 Git。\n\n推荐解决方案（无需系统安装 Git）：\n\
+                format!(
+                    "在线安装 OpenClaw 需要 Git。\n\n推荐解决方案（无需系统安装 Git）：\n\
                 1. 在 src-tauri/resources/git/ 放置 Git for Windows 的 zip（推荐名: git-portable.zip）\n\
                 2. 重新启动应用，应用会优先使用打包 Git\n\n\
-                兜底方案：安装系统 Git（Git for Windows）后重启应用。"
-                    .to_string(),
+                兜底方案：安装系统 Git（Git for Windows）后重启应用。\n\n\
+                runtime 离线安装错误: {}",
+                    runtime_attempt_error.unwrap_or_else(|| "无".to_string())
+                ),
             ),
         });
     }
@@ -891,7 +886,6 @@ if ($openclawVersion) {
         Ok(_) => {
             if runtime_openclaw_cmd.exists()
                 || runtime_openclaw_cmd_bin.exists()
-                || get_openclaw_version().is_some()
             {
                 Ok(InstallResult {
                     success: true,
@@ -913,7 +907,10 @@ if ($openclawVersion) {
         Err(e) => Ok(InstallResult {
             success: false,
             message: "OpenClaw 安装失败".to_string(),
-            error: Some(e),
+            error: Some(match runtime_attempt_error {
+                Some(prev) => format!("{}\nruntime 离线安装错误: {}", e, prev),
+                None => e,
+            }),
         }),
     }
 }
