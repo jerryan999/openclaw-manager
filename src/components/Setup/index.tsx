@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
+import { api } from '../../lib/tauri';
 import { 
   CheckCircle2,
   Loader2, 
@@ -47,6 +48,8 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
   const [installing, setInstalling] = useState<'nodejs' | 'openclaw' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'check' | 'install' | 'complete'>('check');
+  /** OpenClaw 安装/更新渠道：latest | nightly */
+  const [openclawChannel, setOpenclawChannel] = useState<string>('latest');
 
   const checkEnvironment = async () => {
     setupLogger.info('检查系统环境...');
@@ -77,6 +80,12 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
   useEffect(() => {
     setupLogger.info('Setup 组件初始化');
     checkEnvironment();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      api.getOpenclawChannel().then(setOpenclawChannel).catch(() => {});
+    }
   }, []);
 
   const handleInstallNodejs = async () => {
@@ -303,6 +312,51 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                     下载
                   </a>
                 )}
+              </div>
+            )}
+
+            {/* OpenClaw 渠道（仅 Tauri 环境） */}
+            {typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-dark-400">安装/更新渠道</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await api.setOpenclawChannel('latest');
+                        setOpenclawChannel('latest');
+                      } catch (e) {
+                        setupLogger.error('切换渠道失败', e);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      openclawChannel === 'latest'
+                        ? 'bg-brand-500/30 text-brand-300 border border-brand-500/50'
+                        : 'bg-dark-700 text-dark-300 hover:bg-dark-600 border border-dark-600'
+                    }`}
+                  >
+                    Latest
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await api.setOpenclawChannel('nightly');
+                        setOpenclawChannel('nightly');
+                      } catch (e) {
+                        setupLogger.error('切换渠道失败', e);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      openclawChannel === 'nightly'
+                        ? 'bg-brand-500/30 text-brand-300 border border-brand-500/50'
+                        : 'bg-dark-700 text-dark-300 hover:bg-dark-600 border border-dark-600'
+                    }`}
+                  >
+                    Nightly
+                  </button>
+                </div>
               </div>
             )}
 

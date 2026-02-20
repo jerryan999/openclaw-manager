@@ -211,7 +211,35 @@ fn get_git_version() -> Option<String> {
                 return Some(v.trim().to_string());
             }
         }
-        
+
+        // 先尝试单独解压打包的 Git（不依赖完整 offline runtime，避免因无 Node zip 导致从不解压）
+        if let Some(ref git_exe) = shell::ensure_windows_git_if_bundled() {
+            if git_exe.exists() {
+                let cmd = format!("\"{}\" --version", git_exe.display());
+                if let Ok(v) = shell::run_cmd_output(&cmd) {
+                    if !v.is_empty() {
+                        info!("[环境检查] 使用离线 runtime 中的 Git: {}", v.trim());
+                        return Some(v.trim().to_string());
+                    }
+                }
+            }
+        }
+
+        // 离线 runtime 中的 Git（若完整 runtime 已就绪）
+        if let Ok(runtime) = shell::get_windows_offline_runtime() {
+            if let Some(ref git_exe) = runtime.git_exe {
+                if git_exe.exists() {
+                    let cmd = format!("\"{}\" --version", git_exe.display());
+                    if let Ok(v) = shell::run_cmd_output(&cmd) {
+                        if !v.is_empty() {
+                            info!("[环境检查] 使用离线 runtime 中的 Git: {}", v.trim());
+                            return Some(v.trim().to_string());
+                        }
+                    }
+                }
+            }
+        }
+
         // 检查常见的 Git 安装路径
         let common_paths = vec![
             "C:\\Program Files\\Git\\cmd\\git.exe",
@@ -250,7 +278,20 @@ fn get_git_version() -> Option<String> {
             }
         }
         
-        warn!("[环境检查] 未找到 Git，请确保 Git 已安装并在 PATH 中");
+        let reason = match shell::get_git_bundled_failure_reason() {
+            Some(r) => format!("详情: {}", r),
+            None => {
+                let roots = shell::get_windows_resource_roots_for_diagnostic();
+                format!(
+                    "详情: 已找到 resources/git 下的 .zip 但解压或运行未成功。查找时 roots: {:?}",
+                    roots
+                )
+            }
+        };
+        warn!(
+            "[环境检查] 未找到 Git。请安装 Git 或确保 src-tauri/resources/git/ 下有 MinGit 的 .zip（如 git-windows-x64.zip）。{}",
+            reason
+        );
         None
     } else {
         // Unix: 直接调用
@@ -640,21 +681,11 @@ fn get_bundled_openclaw_package_with_app(app: &tauri::AppHandle) -> Option<Strin
     ];
     
     for dir in resource_dirs {
-        if let Ok(entries) = std::fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let filename = path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("");
-                
-                // 匹配 openclaw-zh.tgz 或 jerryan999-openclaw-zh-*.tgz
-                if filename == "openclaw-zh.tgz" || 
-                   (filename.starts_with("jerryan999-openclaw-zh") && filename.ends_with(".tgz")) {
-                    let path_str = path.display().to_string();
-                    info!("[安装OpenClaw] 找到本地离线包: {}", path_str);
-                    return Some(path_str);
-                }
-            }
+        let path = std::path::Path::new(dir).join("openclaw-zh.tgz");
+        if path.is_file() {
+            let path_str = path.display().to_string();
+            info!("[安装OpenClaw] 找到本地离线包: {}", path_str);
+            return Some(path_str);
         }
     }
     
@@ -995,64 +1026,81 @@ pub async fn open_install_terminal(install_type: String) -> Result<String, Strin
 #[command]
 pub async fn open_debug_terminal() -> Result<String, String> {
     if platform::is_windows() {
-        let script = r#"
-Start-Process powershell -ArgumentList '-NoExit', '-Command', '
+        let rt_path = dirs::data_local_dir()
+            .map(|d| d.join("OpenClawManager").join("runtime"))
+            .unwrap_or_else(|| std::path::PathBuf::from("C:\\OpenClawManager\\runtime"))
+            .display()
+            .to_string();
+        let script_body = format!(
+            r#"$rt = "{0}"
+$p1 = [IO.Path]::Combine($rt,'node'); $p2 = [IO.Path]::Combine($rt,'npm-global'); $p3 = [IO.Path]::Combine($rt,'git','cmd'); $p4 = [IO.Path]::Combine($rt,'git','mingw64','bin'); $env:PATH = "$p1;$p2;$p3;$p4;$env:PATH"
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "    OpenClaw 诊断终端" -ForegroundColor White
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-
+Write-Host "[当前运行时]" -ForegroundColor Cyan
+Write-Host "  离线 - 本窗口 PATH 已包含 runtime，以下 node/npm/git/openclaw 均使用离线版本"
+Write-Host ""
+Write-Host "[离线 Runtime 路径]" -ForegroundColor Yellow
+Write-Host "runtime: $rt"
+Write-Host ("node: " + [IO.Path]::Combine($rt,'node','node.exe'))
+Write-Host ("openclaw: " + [IO.Path]::Combine($rt,'npm-global','openclaw.cmd'))
+Write-Host ("git: " + [IO.Path]::Combine($rt,'git','cmd','git.exe'))
+Write-Host ""
 Write-Host "[版本检测]" -ForegroundColor Yellow
 node --version
 npm --version
-openclaw --version
 git --version
-
+openclaw --version
 Write-Host ""
 Write-Host "[路径检测]" -ForegroundColor Yellow
 where node
 where npm
-where openclaw
 where git
-
-Write-Host ""
-Write-Host "[离线 Runtime 路径]" -ForegroundColor Yellow
-$rt = Join-Path $env:LOCALAPPDATA "OpenClawManager\runtime"
-Write-Host "runtime: $rt"
-Write-Host "node: $(Join-Path $rt ''node\node.exe'')"
-Write-Host "openclaw: $(Join-Path $rt ''npm-global\openclaw.cmd'')"
-Write-Host "git: $(Join-Path $rt ''git\cmd\git.exe'')"
-
+where openclaw
 Write-Host ""
 Write-Host "[提示] 可继续手动执行命令排查问题。" -ForegroundColor Green
-'
-"#;
-        shell::run_powershell_output(script)?;
+"#,
+            rt_path.replace('"', "`\"")
+        );
+        let tmp = std::env::temp_dir().join("openclaw_debug_terminal.ps1");
+        std::fs::write(&tmp, &script_body).map_err(|e| format!("写入脚本失败: {}", e))?;
+        // 直接用 Command 启动 powershell -File <path>，避免通过 -Command 传参导致的路径/引号解析问题
+        std::process::Command::new("powershell")
+            .args(["-NoExit", "-ExecutionPolicy", "Bypass", "-File"])
+            .arg(&tmp)
+            .spawn()
+            .map_err(|e| format!("启动诊断终端失败: {}", e))?;
         Ok("已打开诊断终端".to_string())
     } else if platform::is_macos() {
         let script_content = r#"#!/bin/bash
 clear
+RUNTIME="${HOME}/.openclaw-manager/runtime"
+export PATH="$RUNTIME/node/bin:$RUNTIME/npm-global/bin:$RUNTIME/git/bin:$PATH"
 echo "========================================"
 echo "    OpenClaw 诊断终端"
 echo "========================================"
 echo ""
+echo "[当前运行时]"
+echo "  离线 - 本窗口 PATH 已包含 runtime，以下命令将使用离线版本"
+echo ""
+echo "[离线 Runtime 路径]"
+echo "runtime: $RUNTIME"
+echo "node: $RUNTIME/node/node"
+echo "openclaw: $RUNTIME/npm-global/openclaw"
+echo "git: $RUNTIME/git/bin/git"
+echo ""
 echo "[版本检测]"
 node --version
 npm --version
-openclaw --version
 git --version
+openclaw --version
 echo ""
 echo "[路径检测]"
 which node
 which npm
-which openclaw
 which git
-echo ""
-echo "[离线 Runtime 路径]"
-echo "runtime: ~/.openclaw-manager/runtime"
-echo "node: ~/.openclaw-manager/runtime/node/node"
-echo "openclaw: ~/.openclaw-manager/runtime/npm-global/openclaw"
-echo "git: ~/.openclaw-manager/runtime/git/bin/git"
+which openclaw
 echo ""
 echo "[提示] 可继续手动执行命令排查问题。"
 echo ""
@@ -1076,27 +1124,32 @@ exec $SHELL
     } else {
         let script_content = r#"#!/bin/bash
 clear
+RUNTIME="${HOME}/.openclaw-manager/runtime"
+export PATH="$RUNTIME/node/bin:$RUNTIME/npm-global/bin:$RUNTIME/git/bin:$PATH"
 echo "========================================"
 echo "    OpenClaw 诊断终端"
 echo "========================================"
 echo ""
+echo "[当前运行时]"
+echo "  离线 - 本窗口 PATH 已包含 runtime，以下命令将使用离线版本"
+echo ""
+echo "[离线 Runtime 路径]"
+echo "runtime: $RUNTIME"
+echo "node: $RUNTIME/node/node"
+echo "openclaw: $RUNTIME/npm-global/openclaw"
+echo "git: $RUNTIME/git/bin/git"
+echo ""
 echo "[版本检测]"
 node --version
 npm --version
-openclaw --version
 git --version
+openclaw --version
 echo ""
 echo "[路径检测]"
 which node
 which npm
-which openclaw
 which git
-echo ""
-echo "[离线 Runtime 路径]"
-echo "runtime: ~/.openclaw-manager/runtime"
-echo "node: ~/.openclaw-manager/runtime/node/node"
-echo "openclaw: ~/.openclaw-manager/runtime/npm-global/openclaw"
-echo "git: ~/.openclaw-manager/runtime/git/bin/git"
+which openclaw
 echo ""
 echo "[提示] 可继续手动执行命令排查问题。"
 echo ""
@@ -1581,6 +1634,43 @@ fn compare_versions(current: &str, latest: &str) -> bool {
     }
 
     false
+}
+
+fn openclaw_channel_file() -> std::path::PathBuf {
+    if let Some(local) = dirs::data_local_dir() {
+        let dir = local.join("OpenClawManager");
+        let _ = std::fs::create_dir_all(&dir);
+        return dir.join("openclaw-channel.txt");
+    }
+    if let Some(home) = dirs::home_dir() {
+        return home.join(".openclaw-manager-channel.txt");
+    }
+    std::path::PathBuf::from("openclaw-channel.txt")
+}
+
+/// 获取 OpenClaw 安装渠道（latest / nightly）
+#[command]
+pub fn get_openclaw_channel() -> Result<String, String> {
+    let path = openclaw_channel_file();
+    match std::fs::read_to_string(&path) {
+        Ok(s) => {
+            let ch = s.trim().to_lowercase();
+            if ch == "nightly" { Ok("nightly".to_string()) } else { Ok("latest".to_string()) }
+        }
+        _ => Ok("latest".to_string()),
+    }
+}
+
+/// 设置 OpenClaw 安装渠道（latest / nightly）
+#[command]
+pub fn set_openclaw_channel(channel: String) -> Result<String, String> {
+    let ch = channel.trim().to_lowercase();
+    let valid = ch == "latest" || ch == "nightly";
+    let path = openclaw_channel_file();
+    if let Err(e) = std::fs::write(&path, if valid { ch.as_str() } else { "latest" }) {
+        return Err(format!("写入渠道配置失败: {}", e));
+    }
+    Ok(if valid { ch } else { "latest".to_string() })
 }
 
 /// 更新 OpenClaw

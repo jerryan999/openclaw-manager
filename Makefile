@@ -45,8 +45,8 @@ help: ## Show help
 	@echo "  check       Check build environment"
 	@echo "  resources   Download bundled resources"
 	@echo "  install     Install dependencies"
-	@echo "  dev         Run in development mode"
-	@echo "  build       Build offline version"
+	@echo "  dev         Run in development mode (uses src-tauri/resources if present = offline behavior)"
+	@echo "  build       Build offline version (release bundle)"
 	@echo "  release     Build and prepare release"
 	@echo "  clean       Clean build artifacts"
 	@echo "  info        Show project info"
@@ -90,9 +90,9 @@ install: ## Install dependencies
 	@echo ""
 	npm install
 
-dev: ## Run development mode
+dev: ## Run development mode (offline when src-tauri/resources has nodejs/git/openclaw)
 	@echo ""
-	@echo "Starting development mode..."
+	@echo "Starting development mode (uses offline runtime if resources in src-tauri/resources)..."
 	@echo ""
 ifeq ($(DETECTED_OS),Windows)
 	@set PATH=$(CARGO_BIN);%PATH% && npm run tauri:dev

@@ -36,6 +36,8 @@ interface UpdateInfo {
   update_available: boolean;
   current_version: string | null;
   latest_version: string | null;
+  /** 当前渠道：latest / nightly */
+  channel: string | null;
   error: string | null;
 }
 
@@ -258,6 +260,7 @@ function App() {
                       </p>
                       <p className="text-xs text-white/70">
                         当前版本: {updateInfo.current_version}
+                        {updateInfo.channel && ` · 渠道: ${updateInfo.channel}`}
                       </p>
                     </>
                   )}

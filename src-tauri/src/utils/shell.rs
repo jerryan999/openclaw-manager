@@ -52,10 +52,34 @@ pub fn get_extended_path() -> String {
         if let Ok(runtime) = get_windows_offline_runtime() {
             paths.push(runtime.node_dir.display().to_string());
             paths.push(runtime.npm_prefix.display().to_string());
-            if let Some(git_exe) = runtime.git_exe {
-                if let Some(parent) = git_exe.parent() {
-                    paths.push(parent.display().to_string());
+            if let Some(ref git_exe) = runtime.git_exe {
+                if let Some(cmd_dir) = git_exe.parent() {
+                    paths.push(cmd_dir.display().to_string());
+                    // MinGit 的 DLL 在 mingw64/bin，需加入 PATH 才能正常启动 git.exe
+                    if let Some(git_root) = cmd_dir.parent() {
+                        let mingw64_bin = git_root.join("mingw64").join("bin");
+                        if mingw64_bin.exists() {
+                            paths.push(mingw64_bin.display().to_string());
+                        }
+                    }
                 }
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        // 当完整 offline runtime 未就绪（如未打包 Node）时，仍可能已单独解压 Git；补上 PATH 以便 git.exe 能启动
+        let runtime_root = get_windows_runtime_root();
+        let git_cmd = runtime_root.join("git").join("cmd");
+        let git_exe = git_cmd.join("git.exe");
+        if git_exe.exists() {
+            if !paths.iter().any(|p| Path::new(p) == git_cmd) {
+                paths.push(git_cmd.display().to_string());
+            }
+            let mingw64_bin = runtime_root.join("git").join("mingw64").join("bin");
+            if mingw64_bin.exists() && !paths.iter().any(|p| Path::new(p) == mingw64_bin) {
+                paths.push(mingw64_bin.display().to_string());
             }
         }
     }
@@ -139,13 +163,38 @@ fn get_windows_runtime_root() -> PathBuf {
 #[cfg(windows)]
 fn get_windows_resource_roots() -> Vec<PathBuf> {
     let mut roots = Vec::new();
+    // 开发模式：优先使用规范化后的路径，避免 .. 在 Windows 上导致 exists/is_dir 不稳定
     if let Ok(exe) = std::env::current_exe() {
         if let Some(exe_dir) = exe.parent() {
+            let dev_resources = exe_dir.join("..").join("..").join("resources");
+            if dev_resources.exists() {
+                if let Ok(canon) = dev_resources.canonicalize() {
+                    roots.push(canon);
+                }
+                roots.push(dev_resources);
+            }
             roots.push(exe_dir.join("resources"));
             roots.push(exe_dir.join("..").join("resources"));
         }
     }
+    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+        let crate_resources = PathBuf::from(manifest).join("resources");
+        if crate_resources.exists() && !roots.contains(&crate_resources) {
+            roots.push(crate_resources);
+        }
+    }
     roots
+}
+
+/// 供环境检查诊断用：返回当前解析到的 resources 根路径列表。
+#[cfg(windows)]
+pub fn get_windows_resource_roots_for_diagnostic() -> Vec<PathBuf> {
+    get_windows_resource_roots()
+}
+
+#[cfg(not(windows))]
+pub fn get_windows_resource_roots_for_diagnostic() -> Vec<PathBuf> {
+    Vec::new()
 }
 
 #[cfg(windows)]
@@ -368,10 +417,37 @@ fn ensure_windows_preinstalled_npm_prefix(runtime_root: &Path) -> io::Result<Pat
 
 #[cfg(windows)]
 fn find_git_resource_zip() -> Option<PathBuf> {
+    let roots = get_windows_resource_roots();
     for rel in GIT_RESOURCE_CANDIDATES {
         if let Some(path) = find_windows_resource_file(rel) {
+            info!("[资源] 找到 Git 包: {:?}", path);
             return Some(path);
         }
+    }
+    // 兼容未重命名的 MinGit：在 resources/git 目录下任意 .zip 均视为 Git 包
+    if let Some(git_dir) = find_windows_resource_dir("git") {
+        if let Ok(entries) = fs::read_dir(&git_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(ext) = path.extension() {
+                        if ext.eq_ignore_ascii_case("zip") {
+                            info!("[资源] 找到 Git 包: {:?}", path);
+                            return Some(path);
+                        }
+                    }
+                }
+            }
+        }
+        warn!(
+            "[资源] resources/git 目录下无 .zip 文件: {:?}（请将 MinGit 的 .zip 放入此目录）",
+            git_dir
+        );
+    } else {
+        warn!(
+            "[资源] 未找到 resources/git 目录，已尝试 roots: {:?}",
+            roots
+        );
     }
     None
 }
@@ -381,6 +457,8 @@ fn find_git_executable(root: &Path) -> Option<PathBuf> {
     find_parent_dir_with_file(root, "git.exe").map(|p| p.join("git.exe"))
 }
 
+/// 填充 runtime\git：仅当存在打包的 Git zip（如 resources/git/git-windows-x64.zip）时才会解压。
+/// 若未打包 Git 资源，本函数不会创建或写入 git 目录；若之前解压后内容被删，会留下空目录。
 #[cfg(windows)]
 fn ensure_windows_git_runtime(runtime_root: &Path) -> io::Result<Option<PathBuf>> {
     let git_root = runtime_root.join("git");
@@ -388,8 +466,24 @@ fn ensure_windows_git_runtime(runtime_root: &Path) -> io::Result<Option<PathBuf>
         return Ok(Some(exe));
     }
 
-    let Some(git_zip) = find_git_resource_zip() else {
-        return Ok(None);
+    let git_zip = match find_git_resource_zip() {
+        Some(z) => {
+            info!("[资源] 找到 Git 包，开始解压: {:?}", z);
+            z
+        }
+        None => {
+            let roots = get_windows_resource_roots();
+            info!("[资源] find_git_resource_zip 返回 None，已尝试 roots: {:?}", roots);
+            if git_root.is_dir() {
+                let empty = fs::read_dir(&git_root)
+                    .map(|d| d.filter(Result::is_ok).count() == 0)
+                    .unwrap_or(false);
+                if empty {
+                    let _ = fs::remove_dir(&git_root);
+                }
+            }
+            return Ok(None);
+        }
     };
 
     let extract_root = runtime_root.join("tmp-git-extract");
@@ -398,15 +492,98 @@ fn ensure_windows_git_runtime(runtime_root: &Path) -> io::Result<Option<PathBuf>
     }
     extract_zip(&git_zip, &extract_root)?;
 
-    let extracted_git_root = find_top_level_dir_containing_file(&extract_root, "git.exe")
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Git 压缩包中未找到 git.exe"))?;
-    move_or_copy_dir(&extracted_git_root, &git_root)?;
+    // MinGit zip 根目录含多个顶层项：cmd/git.exe、mingw64/（DLL 等）、usr/ 等，
+    // 只复制“含 git.exe 的目录”会缺依赖导致 "error launching git"，故需复制整棵解压树。
+    let top_level: Vec<_> = fs::read_dir(&extract_root)?
+        .filter_map(Result::ok)
+        .collect();
+    let has_git = top_level
+        .iter()
+        .any(|e| find_parent_dir_with_file(&e.path(), "git.exe").is_some());
+    if !has_git {
+        if extract_root.exists() {
+            let _ = fs::remove_dir_all(&extract_root);
+        }
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            "Git 压缩包中未找到 git.exe",
+        ));
+    }
+    fs::create_dir_all(&git_root)?;
+    if top_level.len() == 1 {
+        let only = top_level[0].path();
+        if only.is_dir() {
+            move_or_copy_dir(&only, &git_root)?;
+        } else {
+            let dst = git_root.join(top_level[0].file_name());
+            fs::copy(&only, &dst)?;
+        }
+    } else {
+        for entry in top_level {
+            let src = entry.path();
+            let dst = git_root.join(entry.file_name());
+            if src.is_dir() {
+                move_or_copy_dir(&src, &dst)?;
+            } else {
+                fs::copy(&src, &dst)?;
+                let _ = fs::remove_file(&src);
+            }
+        }
+    }
 
     if extract_root.exists() {
         let _ = fs::remove_dir_all(extract_root);
     }
 
     Ok(find_git_executable(&git_root))
+}
+
+/// 返回「未找到打包 Git」的原因，便于在环境检查里一并打印。
+#[cfg(windows)]
+pub fn get_git_bundled_failure_reason() -> Option<String> {
+    let roots = get_windows_resource_roots();
+    for rel in GIT_RESOURCE_CANDIDATES {
+        if find_windows_resource_file(rel).is_some() {
+            return None;
+        }
+    }
+    if let Some(git_dir) = find_windows_resource_dir("git") {
+        if let Ok(entries) = fs::read_dir(&git_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(ext) = path.extension() {
+                        if ext.eq_ignore_ascii_case("zip") {
+                            return None;
+                        }
+                    }
+                }
+            }
+        }
+        return Some(format!(
+            "resources/git 目录下无 .zip 文件: {:?}",
+            git_dir
+        ));
+    }
+    Some(format!("未找到 resources/git 目录，已尝试 roots: {:?}", roots))
+}
+
+/// 仅解压并返回打包的 Git（不依赖 Node/OpenClaw 是否就绪）。
+/// 当未打包 Node 时 get_windows_offline_runtime() 会失败，导致 Git 从未被解压；此函数可单独触发 Git 解压。
+#[cfg(windows)]
+pub fn ensure_windows_git_if_bundled() -> Option<PathBuf> {
+    let runtime_root = get_windows_runtime_root();
+    match ensure_windows_git_runtime(&runtime_root) {
+        Ok(Some(path)) => Some(path),
+        Ok(None) => {
+            debug!("[资源] 未找到打包的 Git zip，跳过解压");
+            None
+        }
+        Err(e) => {
+            warn!("[资源] 解压打包的 Git 失败: {} (runtime_root: {:?})", e, runtime_root);
+            None
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -416,14 +593,13 @@ pub fn get_windows_offline_runtime() -> Result<WindowsOfflineRuntime, String> {
 
     let node_dir = ensure_windows_node_runtime(&runtime_root)
         .map_err(|e| format!("准备离线 Node.js 失败: {}", e))?;
-    let openclaw_package = ensure_windows_openclaw_package(&runtime_root)
-        .map_err(|e| format!("准备离线 OpenClaw 包失败: {}", e))?;
-
-    let npm_prefix = ensure_windows_preinstalled_npm_prefix(&runtime_root)
-        .map_err(|e| format!("准备预装 OpenClaw 运行时失败: {}", e))?;
-
     let git_exe = ensure_windows_git_runtime(&runtime_root)
         .map_err(|e| format!("准备离线 Git 失败: {}", e))?;
+
+    let openclaw_package = ensure_windows_openclaw_package(&runtime_root)
+        .map_err(|e| format!("准备离线 OpenClaw 包失败: {}", e))?;
+    let npm_prefix = ensure_windows_preinstalled_npm_prefix(&runtime_root)
+        .map_err(|e| format!("准备预装 OpenClaw 运行时失败: {}", e))?;
 
     let openclaw_cmd = npm_prefix.join("openclaw.cmd");
     Ok(WindowsOfflineRuntime {

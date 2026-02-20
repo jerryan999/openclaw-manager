@@ -1,7 +1,7 @@
 # PowerShell 脚本：下载打包资源
 # 用于 Windows 平台的 CI/CD 或本地开发
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = "Stop"
 
 $NODE_VERSION = "22.12.0"
 $OPENCLAW_PACKAGE = "@jerryan999/openclaw-zh"
@@ -64,8 +64,8 @@ Set-Location "openclaw"
 if (Get-Command npm -ErrorAction SilentlyContinue) {
     Write-Host "  使用 npm pack 打包..."
     Remove-Item "*.tgz" -ErrorAction SilentlyContinue
-    # 强制清除缓存并从 registry 获取最新版本
-    npm cache clean --force 2>$null
+    # 校验缓存并从 registry 获取最新版本（npm 5+ 推荐用 verify 替代 clean）
+    npm cache verify
     npm pack "$($OPENCLAW_PACKAGE)@latest" --prefer-online
     
     # 重命名为统一的文件名
@@ -90,27 +90,19 @@ Write-Host "=========================================="
 Write-Host ""
 Write-Host "Node.js:"
 Get-ChildItem "nodejs" -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host "  $($_.Name) - $([math]::Round($_.Length / 1MB, 2)) MB"
+    $mb = [math]::Round($_.Length / 1MB, 2); Write-Host ("  " + $_.Name + " - " + $mb + " MB")
 }
 Write-Host ""
 Write-Host "OpenClaw:"
 Get-ChildItem "openclaw" -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host "  $($_.Name) - $([math]::Round($_.Length / 1MB, 2)) MB"
+    $mb = [math]::Round($_.Length / 1MB, 2); Write-Host ("  " + $_.Name + " - " + $mb + " MB")
 }
 Write-Host ""
 Write-Host "Git (Windows):"
 Get-ChildItem "git" -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host "  $($_.Name) - $([math]::Round($_.Length / 1MB, 2)) MB"
+    $mb = [math]::Round($_.Length / 1MB, 2); Write-Host ("  " + $_.Name + " - " + $mb + " MB")
 }
 Write-Host ""
 
 Write-Host "Done."
 Write-Host ""
-Write-Host "Tips:"
-Write-Host "  - OpenClaw offline install does not require Git"
-Write-Host "  - For full offline: put Git zip at resources/git/git-windows-x64.zip"
-Write-Host "  - Dev mode: not all platform resources are required"
-Write-Host "  - Production: ensure target platform resources are downloaded"
-Write-Host "  - Can run this script in CI/CD"
-Write-Host ""
-Write-Host "Size: Node 40-50MB, OpenClaw 10-20MB, MinGit 10-15MB"

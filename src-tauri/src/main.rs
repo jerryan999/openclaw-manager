@@ -76,6 +76,8 @@ fn main() {
             // 版本更新
             installer::check_openclaw_update,
             installer::update_openclaw,
+            installer::get_openclaw_channel,
+            installer::set_openclaw_channel,
         ])
         .run(tauri::generate_context!())
         .expect("运行 Tauri 应用时发生错误");
