@@ -979,6 +979,19 @@ fn get_unix_openclaw_paths() -> Vec<String> {
 fn get_windows_openclaw_paths() -> Vec<String> {
     let mut paths = Vec::new();
 
+    // 0. OpenClaw Manager runtime（优先）
+    if let Some(local) = dirs::data_local_dir() {
+        paths.push(
+            local
+                .join("OpenClawManager")
+                .join("runtime")
+                .join("npm-global")
+                .join("openclaw.cmd")
+                .display()
+                .to_string(),
+        );
+    }
+
     // 1. nvm4w 安装路径
     paths.push("C:\\nvm4w\\nodejs\\openclaw.cmd".to_string());
 

@@ -724,6 +724,16 @@ fn get_bundled_openclaw_package_with_app(app: &tauri::AppHandle) -> Option<Strin
 /// Windows 安装 OpenClaw
 #[cfg(windows)]
 async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResult, String> {
+    let runtime_root = if let Some(local) = dirs::data_local_dir() {
+        local.join("OpenClawManager").join("runtime")
+    } else if let Some(home) = dirs::home_dir() {
+        home.join("AppData\\Local").join("OpenClawManager").join("runtime")
+    } else {
+        std::path::PathBuf::from("C:\\OpenClawManager\\runtime")
+    };
+    let runtime_prefix = runtime_root.join("npm-global");
+    let runtime_openclaw_cmd = runtime_prefix.join("openclaw.cmd");
+
     // 优先使用 Windows 离线运行时（打包的 Node + OpenClaw 包）
     if let Ok(runtime) = shell::get_windows_offline_runtime() {
         if runtime.openclaw_cmd.exists() {
@@ -804,10 +814,10 @@ if (-not $nodeVersion) {{
 
 Write-Host "使用离线包安装 OpenClaw（无需 Git）..."
 Write-Host "包路径: {}"
-npm install -g "{}" --unsafe-perm
+npm install -g "{}" --prefix "{}" --unsafe-perm --no-audit --fund=false --loglevel=error
 
 # 刷新 PATH
-$npmPrefix = npm prefix -g
+$npmPrefix = "{}"
 $env:Path = "$env:Path;$npmPrefix"
 
 # 验证安装
@@ -820,7 +830,10 @@ if ($openclawVersion) {{
     exit 1
 }}
 "#,
-            package_path, package_path
+            package_path,
+            package_path,
+            runtime_prefix.display(),
+            runtime_prefix.display()
         )
     } else {
         info!("[安装OpenClaw] 使用在线安装，需要 Git");
@@ -844,10 +857,10 @@ if (-not $gitVersion) {
 }
 
 Write-Host "使用 npm 在线安装 OpenClaw..."
-npm install -g @jerryan999/openclaw-zh --unsafe-perm
+npm install -g @jerryan999/openclaw-zh --prefix "__RUNTIME_PREFIX__" --unsafe-perm --no-audit --fund=false --loglevel=error
 
 # 刷新 PATH
-$npmPrefix = npm prefix -g
+$npmPrefix = "__RUNTIME_PREFIX__"
 $env:Path = "$env:Path;$npmPrefix"
 
 # 验证安装
@@ -860,15 +873,18 @@ if ($openclawVersion) {
     exit 1
 }
 "#
-        .to_string()
+        .replace("__RUNTIME_PREFIX__", &runtime_prefix.display().to_string())
     };
 
     match shell::run_powershell_output(&script) {
         Ok(_) => {
-            if get_openclaw_version().is_some() {
+            if runtime_openclaw_cmd.exists() || get_openclaw_version().is_some() {
                 Ok(InstallResult {
                     success: true,
-                    message: "OpenClaw 安装成功！".to_string(),
+                    message: format!(
+                        "OpenClaw 安装成功（runtime: {}）！",
+                        runtime_openclaw_cmd.display()
+                    ),
                     error: None,
                 })
             } else {
