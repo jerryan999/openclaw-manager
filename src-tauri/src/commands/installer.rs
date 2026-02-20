@@ -810,6 +810,8 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
         format!(
             r#"
 $ErrorActionPreference = 'Stop'
+$runtimePrefix = "{}"
+$runtimeOpenClawCmd = "{}"
 
 # 检查 Node.js
 $nodeVersion = node --version 2>$null
@@ -820,31 +822,36 @@ if (-not $nodeVersion) {{
 
 Write-Host "使用离线包安装 OpenClaw（无需 Git）..."
 Write-Host "包路径: {}"
-npm install -g "{}" --prefix "{}" --unsafe-perm --no-audit --fund=false --loglevel=error
+$env:npm_config_prefix = $runtimePrefix
+$env:NPM_CONFIG_PREFIX = $runtimePrefix
+npm install -g "{}" --unsafe-perm --no-audit --fund=false --loglevel=error
 
 # 刷新 PATH
-$npmPrefix = "{}"
+$npmPrefix = $runtimePrefix
 $env:Path = "$env:Path;$npmPrefix"
 
-# 验证安装
-$openclawVersion = openclaw --version 2>$null
-if ($openclawVersion) {{
-    Write-Host "OpenClaw 安装成功: $openclawVersion"
+# 验证安装（只认 runtime 中的 openclaw.cmd，避免误用系统安装）
+if (Test-Path $runtimeOpenClawCmd) {{
+    $openclawVersion = & $runtimeOpenClawCmd --version 2>$null
+    Write-Host "OpenClaw 安装成功(runtime): $openclawVersion"
     exit 0
 }} else {{
-    Write-Host "OpenClaw 安装失败"
+    Write-Host ("OpenClaw 安装失败: runtime 未找到 " + $runtimeOpenClawCmd)
     exit 1
 }}
 "#,
-            package_path,
-            package_path,
             runtime_prefix.display(),
-            runtime_prefix.display()
+            runtime_openclaw_cmd.display(),
+            package_path,
+            package_path,
         )
     } else {
         info!("[安装OpenClaw] 使用在线安装，需要 Git");
-        r#"
+        format!(
+            r#"
 $ErrorActionPreference = 'Stop'
+$runtimePrefix = "{}"
+$runtimeOpenClawCmd = "{}"
 
 # 检查 Node.js
 $nodeVersion = node --version 2>$null
@@ -863,23 +870,28 @@ if (-not $gitVersion) {
 }
 
 Write-Host "使用 npm 在线安装 OpenClaw..."
-npm install -g @jerryan999/openclaw-zh --prefix "__RUNTIME_PREFIX__" --unsafe-perm --no-audit --fund=false --loglevel=error
+$env:npm_config_prefix = $runtimePrefix
+$env:NPM_CONFIG_PREFIX = $runtimePrefix
+npm install -g @jerryan999/openclaw-zh --unsafe-perm --no-audit --fund=false --loglevel=error
 
 # 刷新 PATH
-$npmPrefix = "__RUNTIME_PREFIX__"
+$npmPrefix = $runtimePrefix
 $env:Path = "$env:Path;$npmPrefix"
 
-# 验证安装
-$openclawVersion = openclaw --version 2>$null
-if ($openclawVersion) {
-    Write-Host "OpenClaw 安装成功: $openclawVersion"
+# 验证安装（只认 runtime 中的 openclaw.cmd，避免误用系统安装）
+if (Test-Path $runtimeOpenClawCmd) {
+    $openclawVersion = & $runtimeOpenClawCmd --version 2>$null
+    Write-Host "OpenClaw 安装成功(runtime): $openclawVersion"
     exit 0
 } else {
-    Write-Host "OpenClaw 安装失败"
+    Write-Host ("OpenClaw 安装失败: runtime 未找到 " + $runtimeOpenClawCmd)
     exit 1
 }
 "#
-        .replace("__RUNTIME_PREFIX__", &runtime_prefix.display().to_string())
+            ,
+            runtime_prefix.display(),
+            runtime_openclaw_cmd.display()
+        )
     };
 
     match shell::run_powershell_output(&script) {
