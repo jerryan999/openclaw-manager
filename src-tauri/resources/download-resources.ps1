@@ -14,6 +14,7 @@ Write-Host ""
 # 创建目录
 New-Item -ItemType Directory -Force -Path "nodejs" | Out-Null
 New-Item -ItemType Directory -Force -Path "openclaw" | Out-Null
+New-Item -ItemType Directory -Force -Path "git" | Out-Null
 
 # 下载 Node.js for Windows
 Write-Host "📦 下载 Node.js v$NODE_VERSION..."
@@ -32,6 +33,27 @@ try {
     Write-Host "  ✗ 下载失败: $_"
 }
 
+Set-Location ".."
+Write-Host ""
+
+# 下载 MinGit for Windows（可选，用于离线 Git）
+Write-Host "📦 下载 MinGit (Windows 64-bit)..."
+Set-Location "git"
+$GIT_VERSION = "2.53.0"
+$gitUrl = "https://github.com/git-for-windows/git/releases/download/v$GIT_VERSION.windows.1/MinGit-$GIT_VERSION-64-bit.zip"
+$gitFile = "git-windows-x64.zip"
+if (-not (Test-Path $gitFile)) {
+    try {
+        Write-Host "  从 $gitUrl 下载..."
+        Invoke-WebRequest -Uri $gitUrl -OutFile $gitFile -UseBasicParsing
+        Write-Host "  ✓ 下载完成: $gitFile"
+    } catch {
+        Write-Host "  ✗ 下载失败: $_"
+        Write-Host "  可手动从 https://github.com/git-for-windows/git/releases 下载 MinGit-*-64-bit.zip 并重命名为 $gitFile"
+    }
+} else {
+    Write-Host "  ✓ 已存在: $gitFile（跳过）"
+}
 Set-Location ".."
 Write-Host ""
 
@@ -76,16 +98,19 @@ Get-ChildItem "openclaw" -ErrorAction SilentlyContinue | ForEach-Object {
     Write-Host "  $($_.Name) - $([math]::Round($_.Length / 1MB, 2)) MB"
 }
 Write-Host ""
+Write-Host "Git (Windows):"
+Get-ChildItem "git" -ErrorAction SilentlyContinue | ForEach-Object {
+    Write-Host "  $($_.Name) - $([math]::Round($_.Length / 1MB, 2)) MB"
+}
+Write-Host ""
 
-Write-Host "✅ 完成！"
+Write-Host "Done."
 Write-Host ""
-Write-Host "💡 提示："
-Write-Host "  - OpenClaw 离线包安装时不需要 Git，更可靠"
-Write-Host "  - 开发模式不需要下载所有平台的资源"
-Write-Host "  - 生产构建时确保目标平台的资源已下载"
-Write-Host "  - 可以在 CI/CD 中运行此脚本自动下载"
+Write-Host "Tips:"
+Write-Host "  - OpenClaw offline install does not require Git"
+Write-Host "  - For full offline: put Git zip at resources/git/git-windows-x64.zip"
+Write-Host "  - Dev mode: not all platform resources are required"
+Write-Host "  - Production: ensure target platform resources are downloaded"
+Write-Host "  - Can run this script in CI/CD"
 Write-Host ""
-Write-Host "📦 打包体积影响："
-Write-Host "  - Node.js (Windows): ~40-50MB"
-Write-Host "  - OpenClaw .tgz: ~10-20MB"
-Write-Host "  - 总计: ~50-70MB"
+Write-Host "Size: Node 40-50MB, OpenClaw 10-20MB, MinGit 10-15MB"
