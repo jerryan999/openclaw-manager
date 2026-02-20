@@ -733,6 +733,10 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
     };
     let runtime_prefix = runtime_root.join("npm-global");
     let runtime_openclaw_cmd = runtime_prefix.join("openclaw.cmd");
+    let runtime_openclaw_cmd_bin = runtime_prefix
+        .join("node_modules")
+        .join(".bin")
+        .join("openclaw.cmd");
 
     // 优先使用 Windows 离线运行时（打包的 Node + OpenClaw 包）
     if let Ok(runtime) = shell::get_windows_offline_runtime() {
@@ -760,7 +764,10 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
         );
         match shell::run_cmd_output(&install_cmd) {
             Ok(_) => {
-                if runtime.openclaw_cmd.exists() || get_openclaw_version().is_some() {
+                if runtime.openclaw_cmd.exists()
+                    || runtime_openclaw_cmd_bin.exists()
+                    || get_openclaw_version().is_some()
+                {
                     return Ok(InstallResult {
                         success: true,
                         message: "OpenClaw 离线安装成功！".to_string(),
@@ -770,7 +777,11 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
                 return Ok(InstallResult {
                     success: false,
                     message: "OpenClaw 安装失败".to_string(),
-                    error: Some("安装命令执行成功，但未找到 openclaw.cmd".to_string()),
+                    error: Some(format!(
+                        "安装命令执行成功，但未找到 openclaw.cmd（已检查: {}, {}）",
+                        runtime.openclaw_cmd.display(),
+                        runtime_openclaw_cmd_bin.display()
+                    )),
                 });
             }
             Err(e) => {
@@ -878,12 +889,16 @@ if ($openclawVersion) {
 
     match shell::run_powershell_output(&script) {
         Ok(_) => {
-            if runtime_openclaw_cmd.exists() || get_openclaw_version().is_some() {
+            if runtime_openclaw_cmd.exists()
+                || runtime_openclaw_cmd_bin.exists()
+                || get_openclaw_version().is_some()
+            {
                 Ok(InstallResult {
                     success: true,
                     message: format!(
-                        "OpenClaw 安装成功（runtime: {}）！",
-                        runtime_openclaw_cmd.display()
+                        "OpenClaw 安装成功（runtime: {}, 备用: {}）！",
+                        runtime_openclaw_cmd.display(),
+                        runtime_openclaw_cmd_bin.display()
                     ),
                     error: None,
                 })

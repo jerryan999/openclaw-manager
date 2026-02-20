@@ -981,11 +981,15 @@ fn get_windows_openclaw_paths() -> Vec<String> {
 
     // 0. OpenClaw Manager runtime（优先）
     if let Some(local) = dirs::data_local_dir() {
+        let runtime_prefix = local
+            .join("OpenClawManager")
+            .join("runtime")
+            .join("npm-global");
+        paths.push(runtime_prefix.join("openclaw.cmd").display().to_string());
         paths.push(
-            local
-                .join("OpenClawManager")
-                .join("runtime")
-                .join("npm-global")
+            runtime_prefix
+                .join("node_modules")
+                .join(".bin")
                 .join("openclaw.cmd")
                 .display()
                 .to_string(),
