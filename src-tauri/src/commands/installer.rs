@@ -1,6 +1,7 @@
 use crate::utils::{platform, shell, bundled};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tauri::command;
 
 /// 环境检查结果
@@ -88,12 +89,32 @@ pub async fn check_environment(app: tauri::AppHandle) -> Result<EnvironmentStatu
 
     // 检查 OpenClaw
     info!("[环境检查] 检查 OpenClaw...");
-    let openclaw_version = get_openclaw_version();
-    let openclaw_installed = openclaw_version.is_some();
-    let openclaw_path = if openclaw_installed {
-        shell::get_openclaw_path()
+    let (openclaw_installed, openclaw_version, openclaw_path) = if platform::is_windows() {
+        let runtime_path = get_windows_runtime_openclaw_path();
+        let runtime_version = get_windows_runtime_openclaw_version(runtime_path.as_deref());
+        let system_version = get_openclaw_version();
+        let system_path = shell::get_openclaw_path();
+
+        info!(
+            "[环境检查] OpenClaw(Windows): runtime_version={:?}, runtime_path={:?}, system_version={:?}, system_path={:?}",
+            runtime_version, runtime_path, system_version, system_path
+        );
+
+        // Windows 上安装状态仅认 OpenClawManager runtime，避免系统 openclaw 误判为已安装
+        (
+            runtime_version.is_some(),
+            runtime_version,
+            runtime_path,
+        )
     } else {
-        None
+        let version = get_openclaw_version();
+        let installed = version.is_some();
+        let path = if installed {
+            shell::get_openclaw_path()
+        } else {
+            None
+        };
+        (installed, version, path)
     };
     info!(
         "[环境检查] OpenClaw: installed={}, version={:?}, path={:?}",
@@ -478,6 +499,42 @@ fn get_openclaw_version() -> Option<String> {
     shell::run_openclaw(&["--version"])
         .ok()
         .map(|v| v.trim().to_string())
+}
+
+fn get_windows_runtime_root_path() -> PathBuf {
+    if let Some(local) = dirs::data_local_dir() {
+        return local.join("OpenClawManager").join("runtime");
+    }
+    if let Some(home) = dirs::home_dir() {
+        return home
+            .join("AppData\\Local")
+            .join("OpenClawManager")
+            .join("runtime");
+    }
+    PathBuf::from("C:\\OpenClawManager\\runtime")
+}
+
+fn get_windows_runtime_openclaw_candidates() -> Vec<PathBuf> {
+    let runtime_prefix = get_windows_runtime_root_path().join("npm-global");
+    vec![
+        runtime_prefix.join("openclaw.cmd"),
+        runtime_prefix.join("node_modules").join(".bin").join("openclaw.cmd"),
+    ]
+}
+
+fn get_windows_runtime_openclaw_path() -> Option<String> {
+    for candidate in get_windows_runtime_openclaw_candidates() {
+        if candidate.exists() {
+            return Some(candidate.display().to_string());
+        }
+    }
+    None
+}
+
+fn get_windows_runtime_openclaw_version(path: Option<&str>) -> Option<String> {
+    let path = path?;
+    let cmd = format!("\"{}\" --version", path);
+    shell::run_cmd_output(&cmd).ok().map(|v| v.trim().to_string())
 }
 
 /// 检查 Node.js 版本是否 >= 22
