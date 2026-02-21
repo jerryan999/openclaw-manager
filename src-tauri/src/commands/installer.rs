@@ -855,19 +855,19 @@ $runtimeOpenClawCmd = "{}"
 
 # 检查 Node.js
 $nodeVersion = node --version 2>$null
-if (-not $nodeVersion) {
+if (-not $nodeVersion) {{
     Write-Host "错误：请先安装 Node.js"
     exit 1
-}
+}}
 
 # 检查 Git（在线安装需要）
 $gitVersion = git --version 2>$null
-if (-not $gitVersion) {
+if (-not $gitVersion) {{
     Write-Host "错误：在线安装需要 Git"
     Write-Host "请优先放置打包 Git：src-tauri/resources/git/git-portable.zip"
     Write-Host "（也可安装系统 Git 作为兜底）"
     exit 1
-}
+}}
 
 Write-Host "使用 npm 在线安装 OpenClaw..."
 $env:npm_config_prefix = $runtimePrefix
@@ -879,14 +879,14 @@ $npmPrefix = $runtimePrefix
 $env:Path = "$env:Path;$npmPrefix"
 
 # 验证安装（只认 runtime 中的 openclaw.cmd，避免误用系统安装）
-if (Test-Path $runtimeOpenClawCmd) {
+if (Test-Path $runtimeOpenClawCmd) {{
     $openclawVersion = & $runtimeOpenClawCmd --version 2>$null
     Write-Host "OpenClaw 安装成功(runtime): $openclawVersion"
     exit 0
-} else {
+}} else {{
     Write-Host ("OpenClaw 安装失败: runtime 未找到 " + $runtimeOpenClawCmd)
     exit 1
-}
+}}
 "#
             ,
             runtime_prefix.display(),
