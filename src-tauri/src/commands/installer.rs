@@ -1115,15 +1115,59 @@ Write-Host ("npm(runtime exists): " + (Test-Path ([IO.Path]::Combine($rt,'node',
 Write-Host ("openclaw(runtime exists): " + (Test-Path ([IO.Path]::Combine($rt,'npm-global','openclaw.cmd'))))
 Write-Host ("git(runtime exists): " + (Test-Path ([IO.Path]::Combine($rt,'git','cmd','git.exe'))))
 Write-Host ""
+function Resolve-CommandPath($name) {
+  $runtimeCandidates = @()
+  switch ($name) {
+    "node" {
+      $runtimeCandidates += [IO.Path]::Combine($rt, "node", "node.exe")
+    }
+    "npm" {
+      $runtimeCandidates += [IO.Path]::Combine($rt, "node", "npm.cmd")
+    }
+    "git" {
+      $runtimeCandidates += [IO.Path]::Combine($rt, "git", "cmd", "git.exe")
+    }
+    "openclaw" {
+      $runtimeCandidates += [IO.Path]::Combine($rt, "npm-global", "openclaw.cmd")
+      $runtimeCandidates += [IO.Path]::Combine($rt, "npm-global", "node_modules", ".bin", "openclaw.cmd")
+    }
+  }
+
+  foreach ($candidate in $runtimeCandidates) {
+    if ($candidate -and (Test-Path $candidate)) {
+      return @{ Path = $candidate; Source = "离线 runtime" }
+    }
+  }
+
+  $cmd = Get-Command $name -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($cmd -and $cmd.Source -and (Test-Path $cmd.Source)) {
+    return @{ Path = $cmd.Source; Source = "系统/外部" }
+  }
+
+  $whereLines = @(where.exe $name 2>$null)
+  foreach ($line in $whereLines) {
+    $candidate = "$line".Trim()
+    if ($candidate -and (Test-Path $candidate)) {
+      return @{ Path = $candidate; Source = "系统路径兜底" }
+    }
+  }
+
+  return $null
+}
+
 function Show-Version($name) {
-  $cmd = Get-Command $name -ErrorAction SilentlyContinue
-  if (-not $cmd) {
+  $resolved = Resolve-CommandPath $name
+  if (-not $resolved) {
     Write-Host ("${name}: NOT FOUND")
     return
   }
-  $path = $cmd.Source
-  $source = if ($path.StartsWith($rt, [System.StringComparison]::OrdinalIgnoreCase)) { "离线 runtime" } else { "系统/外部" }
-  $version = (& $path --version 2>&1 | Select-Object -First 1)
+  $path = $resolved.Path
+  $source = $resolved.Source
+  if ($name -eq "npm") {
+    $version = (& $path -v 2>&1 | Select-Object -First 1)
+  } else {
+    $version = (& $path --version 2>&1 | Select-Object -First 1)
+  }
   if (-not $version) { $version = "(无版本输出)" }
   Write-Host ("${name}: $version")
   Write-Host ("  path: $path")
