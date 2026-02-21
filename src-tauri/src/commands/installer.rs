@@ -2,6 +2,7 @@ use crate::utils::{platform, shell, bundled};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::process::Command;
 use tauri::command;
 
 /// 环境检查结果
@@ -92,24 +93,14 @@ pub async fn check_environment(app: tauri::AppHandle) -> Result<EnvironmentStatu
     let (openclaw_installed, openclaw_version, openclaw_path) = if platform::is_windows() {
         let runtime_path = get_windows_runtime_openclaw_path();
         let runtime_version = get_windows_runtime_openclaw_version(runtime_path.as_deref());
-        // 已有 runtime 版本时不再调用 get_openclaw_version/get_openclaw_path，避免重复触发
-        // get_windows_offline_runtime 与 run_openclaw，显著加快环境检查
-        let (system_version, system_path) = if runtime_version.is_some() {
-            (None as Option<String>, None as Option<String>)
-        } else {
-            (
-                get_openclaw_version(),
-                shell::get_openclaw_path(),
-            )
-        };
         info!(
-            "[环境检查] OpenClaw(Windows): runtime_version={:?}, runtime_path={:?}, system_version={:?}, system_path={:?}",
-            runtime_version, runtime_path, system_version, system_path
+            "[环境检查] OpenClaw(Windows): runtime_version={:?}, runtime_path={:?}",
+            runtime_version, runtime_path
         );
 
         // Windows 上安装状态仅认 OpenClawManager runtime，避免系统 openclaw 误判为已安装
         (
-            runtime_version.is_some(),
+            runtime_path.is_some(),
             runtime_version,
             runtime_path,
         )
@@ -183,7 +174,7 @@ fn get_node_version_from_path(node_path: Option<&str>) -> Option<String> {
     let Some(path) = node_path else {
         return None;
     };
-    if let Ok(v) = shell::run_command_output(path, &["--version"]) {
+    if let Ok(v) = run_program_output(path, &["--version"]) {
         let version = v.trim().to_string();
         if !version.is_empty() && version.starts_with('v') {
             return Some(version);
@@ -194,11 +185,10 @@ fn get_node_version_from_path(node_path: Option<&str>) -> Option<String> {
 
 fn get_preferred_node_path() -> Option<String> {
     if platform::is_windows() {
-        if let Ok(runtime) = shell::get_windows_offline_runtime() {
-            let node_exe = runtime.node_dir.join("node.exe");
-            if node_exe.exists() {
-                return Some(node_exe.display().to_string());
-            }
+        // 仅检测 runtime 中现有的 Node，不触发离线 runtime 自动准备
+        let runtime_node = get_windows_runtime_root_path().join("node").join("node.exe");
+        if runtime_node.exists() {
+            return Some(runtime_node.display().to_string());
         }
 
         for path in get_windows_node_paths() {
@@ -207,7 +197,7 @@ fn get_preferred_node_path() -> Option<String> {
             }
         }
 
-        if let Ok(output) = shell::run_cmd_output("where node") {
+        if let Ok(output) = run_program_output("where", &["node"]) {
             if let Some(path) = output.lines().map(str::trim).find(|line| !line.is_empty()) {
                 return Some(path.to_string());
             }
@@ -247,45 +237,24 @@ fn get_preferred_node_path() -> Option<String> {
 /// 获取 Git 版本
 fn get_git_version() -> Option<String> {
     if platform::is_windows() {
-        // Windows: 优先尝试打包的 Git（不依赖完整 offline runtime，避免要求先安装系统 Git）
-        if let Some(ref git_exe) = shell::ensure_windows_git_if_bundled() {
-            if git_exe.exists() {
-                let cmd = format!("\"{}\" --version", git_exe.display());
-                if let Ok(v) = shell::run_cmd_output(&cmd) {
-                    if !v.is_empty() {
-                        info!("[环境检查] 使用离线 runtime 中的 Git: {}", v.trim());
-                        return Some(v.trim().to_string());
-                    }
-                }
-            }
-        }
-
-        // 完整离线 runtime 中的 Git（若 Node/OpenClaw 资源也就绪）
-        if let Ok(runtime) = shell::get_windows_offline_runtime() {
-            if let Some(ref git_exe) = runtime.git_exe {
-                if git_exe.exists() {
-                    let cmd = format!("\"{}\" --version", git_exe.display());
-                    if let Ok(v) = shell::run_cmd_output(&cmd) {
-                        if !v.is_empty() {
-                            info!("[环境检查] 使用离线 runtime 中的 Git: {}", v.trim());
-                            return Some(v.trim().to_string());
-                        }
-                    }
+        // 仅检测 runtime 中已存在的 Git，不触发自动解压
+        let runtime_git = get_windows_runtime_root_path()
+            .join("git")
+            .join("cmd")
+            .join("git.exe");
+        if runtime_git.exists() {
+            if let Ok(v) = run_program_output(runtime_git.to_string_lossy().as_ref(), &["--version"]) {
+                if !v.is_empty() {
+                    info!("[环境检查] 使用 runtime 中的 Git: {}", v.trim());
+                    return Some(v.trim().to_string());
                 }
             }
         }
 
         // 回退：系统 PATH 中的 Git
-        if let Ok(v) = shell::run_cmd_output("git --version") {
+        if let Ok(v) = run_program_output("git", &["--version"]) {
             if !v.is_empty() {
-                info!("[环境检查] 通过 cmd 找到 Git: {}", v.trim());
-                return Some(v.trim().to_string());
-            }
-        }
-
-        if let Ok(v) = shell::run_powershell_output("git --version") {
-            if !v.is_empty() {
-                info!("[环境检查] 通过 PowerShell 找到 Git: {}", v.trim());
+                info!("[环境检查] 通过 PATH 找到 Git: {}", v.trim());
                 return Some(v.trim().to_string());
             }
         }
@@ -305,8 +274,7 @@ fn get_git_version() -> Option<String> {
             for path in vec![user_local, user_git] {
                 if std::path::Path::new(&path).exists() {
                     // 尝试执行找到的 git
-                    let cmd = format!("\"{}\" --version", path);
-                    if let Ok(v) = shell::run_cmd_output(&cmd) {
+                    if let Ok(v) = run_program_output(&path, &["--version"]) {
                         if !v.is_empty() {
                             info!("[环境检查] 在 {} 找到 Git: {}", path, v.trim());
                             return Some(v.trim().to_string());
@@ -318,8 +286,7 @@ fn get_git_version() -> Option<String> {
         
         for path in common_paths {
             if std::path::Path::new(path).exists() {
-                let cmd = format!("\"{}\" --version", path);
-                if let Ok(v) = shell::run_cmd_output(&cmd) {
+                if let Ok(v) = run_program_output(path, &["--version"]) {
                     if !v.is_empty() {
                         info!("[环境检查] 在 {} 找到 Git: {}", path, v.trim());
                         return Some(v.trim().to_string());
@@ -328,24 +295,11 @@ fn get_git_version() -> Option<String> {
             }
         }
         
-        let reason = match shell::get_git_bundled_failure_reason() {
-            Some(r) => format!("详情: {}", r),
-            None => {
-                let roots = shell::get_windows_resource_roots_for_diagnostic();
-                format!(
-                    "详情: 已找到 resources/git 下的 .zip 但解压或运行未成功。查找时 roots: {:?}",
-                    roots
-                )
-            }
-        };
-        warn!(
-            "[环境检查] 未找到 Git。请安装 Git 或确保 src-tauri/resources/git/ 下有 Git for Windows 的 .zip（如 git-portable.zip）。{}",
-            reason
-        );
+        warn!("[环境检查] 未找到 Git（仅检测现有安装，未触发自动准备）。");
         None
     } else {
         // Unix: 直接调用
-        if let Ok(v) = shell::run_command_output("git", &["--version"]) {
+        if let Ok(v) = run_program_output("git", &["--version"]) {
             if !v.is_empty() {
                 info!("[环境检查] 找到 Git: {}", v.trim());
                 return Some(v.trim().to_string());
@@ -353,6 +307,24 @@ fn get_git_version() -> Option<String> {
         }
         
         None
+    }
+}
+
+fn run_program_output(cmd: &str, args: &[&str]) -> Result<String, String> {
+    let output = Command::new(cmd)
+        .args(args)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if stderr.is_empty() {
+            Err(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        } else {
+            Err(stderr)
+        }
     }
 }
 
@@ -1212,6 +1184,7 @@ pub async fn init_openclaw_config() -> Result<InstallResult, String> {
 pub async fn open_install_terminal(install_type: String) -> Result<String, String> {
     match install_type.as_str() {
         "nodejs" => open_nodejs_install_terminal().await,
+        "git" => open_git_install_terminal().await,
         "openclaw" => open_openclaw_install_terminal().await,
         _ => Err(format!("未知的安装类型: {}", install_type)),
     }
@@ -1693,6 +1666,108 @@ read -p "按回车键关闭此窗口..."
         Ok("已打开安装终端".to_string())
     } else {
         Err("请手动安装 Node.js: https://nodejs.org/".to_string())
+    }
+}
+
+/// 打开终端安装 Git
+async fn open_git_install_terminal() -> Result<String, String> {
+    if platform::is_windows() {
+        let script = r#"
+Start-Process powershell -ArgumentList '-NoExit', '-Command', '
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "    Git 安装向导" -ForegroundColor White
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+$hasWinget = Get-Command winget -ErrorAction SilentlyContinue
+if ($hasWinget) {
+    Write-Host "正在使用 winget 安装 Git..." -ForegroundColor Yellow
+    winget install --id Git.Git --accept-source-agreements --accept-package-agreements
+} else {
+    Write-Host "请从以下地址下载安装 Git for Windows:" -ForegroundColor Yellow
+    Write-Host "https://git-scm.com/download/win" -ForegroundColor Green
+    Write-Host ""
+    Start-Process "https://git-scm.com/download/win"
+}
+
+Write-Host ""
+Write-Host "安装完成后请返回应用点击【重新检查】" -ForegroundColor Green
+Write-Host ""
+Read-Host "按回车键关闭此窗口"
+' -Verb RunAs
+"#;
+        shell::run_powershell_output(script)?;
+        Ok("已打开 Git 安装终端".to_string())
+    } else if platform::is_macos() {
+        let script_content = r#"#!/bin/bash
+clear
+echo "========================================"
+echo "    Git 安装向导"
+echo "========================================"
+echo ""
+
+if command -v brew &> /dev/null; then
+  echo "正在使用 Homebrew 安装 Git..."
+  brew install git
+else
+  echo "未检测到 Homebrew，将打开 Git 下载页面..."
+  open "https://git-scm.com/download/mac"
+fi
+
+echo ""
+echo "安装完成后请返回应用点击【重新检查】"
+read -p "按回车键关闭此窗口..."
+"#;
+
+        let script_path = "/tmp/openclaw_install_git.command";
+        std::fs::write(script_path, script_content).map_err(|e| format!("创建脚本失败: {}", e))?;
+
+        std::process::Command::new("chmod")
+            .args(["+x", script_path])
+            .output()
+            .map_err(|e| format!("设置权限失败: {}", e))?;
+
+        std::process::Command::new("open")
+            .arg(script_path)
+            .spawn()
+            .map_err(|e| format!("启动终端失败: {}", e))?;
+
+        Ok("已打开 Git 安装终端".to_string())
+    } else {
+        let script_content = r#"#!/bin/bash
+clear
+echo "========================================"
+echo "    Git 安装向导"
+echo "========================================"
+echo ""
+echo "请使用系统包管理器安装 Git，例如："
+echo "  Debian/Ubuntu: sudo apt-get install -y git"
+echo "  Fedora/RHEL:   sudo dnf install -y git"
+echo "  Arch:          sudo pacman -S --noconfirm git"
+echo ""
+read -p "按回车键关闭..."
+"#;
+
+        let script_path = "/tmp/openclaw_install_git.sh";
+        std::fs::write(script_path, script_content).map_err(|e| format!("创建脚本失败: {}", e))?;
+
+        std::process::Command::new("chmod")
+            .args(["+x", script_path])
+            .output()
+            .map_err(|e| format!("设置权限失败: {}", e))?;
+
+        let terminals = ["gnome-terminal", "xfce4-terminal", "konsole", "xterm"];
+        for term in terminals {
+            if std::process::Command::new(term)
+                .args(["--", script_path])
+                .spawn()
+                .is_ok()
+            {
+                return Ok("已打开 Git 安装终端".to_string());
+            }
+        }
+
+        Err("无法启动终端，请手动安装 Git".to_string())
     }
 }
 

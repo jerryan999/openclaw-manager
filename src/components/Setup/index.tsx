@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Loader2, 
   Download,
-  ArrowRight,
   RefreshCw,
   ExternalLink,
   Cpu,
@@ -45,7 +44,7 @@ interface SetupProps {
 export function Setup({ onComplete, embedded = false }: SetupProps) {
   const [envStatus, setEnvStatus] = useState<EnvironmentStatus | null>(null);
   const [checking, setChecking] = useState(true);
-  const [installing, setInstalling] = useState<'nodejs' | 'openclaw' | null>(null);
+  const [installing, setInstalling] = useState<'nodejs' | 'git' | 'openclaw' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'check' | 'install' | 'complete'>('check');
   /** OpenClaw 安装/更新渠道：latest | nightly */
@@ -165,6 +164,22 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
           setError(`安装失败: ${e}。${termErr}`);
         }
       }
+    } finally {
+      setInstalling(null);
+    }
+  };
+
+  const handleInstallGit = async () => {
+    setupLogger.action('安装 Git');
+    setupLogger.info('开始安装 Git...');
+    setInstalling('git');
+    setError(null);
+
+    try {
+      await invoke<string>('open_install_terminal', { installType: 'git' });
+      setError('已打开 Git 安装终端，请在终端中完成安装后点击"重新检查"');
+    } catch (e) {
+      setError(`打开 Git 安装终端失败: ${e}`);
     } finally {
       setInstalling(null);
     }
@@ -296,17 +311,29 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                 
                 {envStatus.git_installed ? (
                   <CheckCircle2 className="w-6 h-6 text-green-400" />
-                ) : envStatus.has_offline_package ? (
-                  <span className="text-xs text-blue-400 px-3 py-1 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                    可选
-                  </span>
                 ) : (
-                  <span
-                    className="text-xs text-amber-300 px-3 py-2 bg-amber-500/10 rounded-lg border border-amber-500/30"
-                    title="在线安装需要 Git；优先使用打包的 git-portable.zip"
+                  <button
+                    onClick={handleInstallGit}
+                    disabled={installing !== null}
+                    className="btn-primary text-sm px-4 py-2 flex items-center gap-2"
+                    title={
+                      envStatus.has_offline_package
+                        ? '已有离线包，Git 可选安装'
+                        : '在线安装需要 Git；建议优先放置 git-portable.zip'
+                    }
                   >
-                    需要 Git（建议放置 git-portable.zip）
-                  </span>
+                    {installing === 'git' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        安装中...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        {envStatus.has_offline_package ? '安装 (可选)' : '安装'}
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
             )}
@@ -369,7 +396,9 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                 <div>
                   <p className="text-white font-medium">OpenClaw</p>
                   <p className="text-sm text-dark-400">
-                    {envStatus.openclaw_version || '未安装'}
+                    {envStatus.openclaw_installed
+                      ? (envStatus.openclaw_version || '已安装')
+                      : '未安装'}
                   </p>
                 </div>
               </div>
@@ -442,16 +471,6 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                 <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
                 重新检查
               </button>
-              
-              {envStatus.ready && (
-                <button
-                  onClick={onComplete}
-                  className="flex-1 btn-primary py-2.5 flex items-center justify-center gap-2"
-                >
-                  开始使用
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              )}
             </div>
 
             {/* 帮助链接 */}
