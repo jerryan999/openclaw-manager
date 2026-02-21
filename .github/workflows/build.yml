@@ -86,15 +86,15 @@ jobs:
           if (Test-Path $offlinePrefix) { Remove-Item -Recurse -Force $offlinePrefix }
           New-Item -ItemType Directory -Force -Path $offlinePrefix | Out-Null
 
-          & $npmCmd install -g "src-tauri/resources/openclaw/openclaw-zh.tgz" --prefix $offlinePrefix --no-audit --fund=false --loglevel=error
+          & $npmCmd install -g "src-tauri/resources/openclaw/openclaw.tgz" --prefix $offlinePrefix --no-audit --fund=false --loglevel=error
           if ($LASTEXITCODE -ne 0) { throw "offline openclaw install failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path "$offlinePrefix/openclaw.cmd")) { throw "openclaw.cmd not found after preinstall" }
-          $pkgDir = Join-Path $offlinePrefix "node_modules\@jerryan999\openclaw-zh"
+          $pkgDir = Join-Path $offlinePrefix "node_modules\openclaw"
           if (Test-Path $pkgDir) {
             $env:PATH = "$nodeDir;$env:PATH"
             Push-Location $pkgDir
             & $npmCmd install --omit=dev --no-audit --fund=false --loglevel=error
-            if ($LASTEXITCODE -ne 0) { throw "npm install in openclaw-zh failed with exit code $LASTEXITCODE" }
+            if ($LASTEXITCODE -ne 0) { throw "npm install in openclaw failed with exit code $LASTEXITCODE" }
             Pop-Location
           }
 

@@ -32,9 +32,9 @@ node-windows-x64.zip - 33.26 MB
 
 ### src-tauri/resources/openclaw/
 ```
-openclaw-zh.tgz - 16.56 MB
+openclaw.tgz - 16.56 MB
 ```
-- **来源**: npm registry (@jerryan999/openclaw-zh@latest)
+- **来源**: npm registry (openclaw@latest)
 - **版本**: 2026.2.15-zh.2
 - **用途**: OpenClaw 离线安装包
 - **优势**: 不需要 Git，更可靠

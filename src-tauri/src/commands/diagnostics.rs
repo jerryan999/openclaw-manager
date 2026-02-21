@@ -109,7 +109,7 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
         suggestion: if openclaw_installed {
             None
         } else {
-            Some("运行: npm install -g @jerryan999/openclaw-zh".to_string())
+            Some("运行: npm install -g openclaw@latest".to_string())
         },
     });
 

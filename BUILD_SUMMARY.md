@@ -125,7 +125,7 @@ src-tauri/resources/
 ├── nodejs/
 │   └── node-windows-x64.zip     ✅ 33.26 MB
 ├── openclaw/
-│   └── openclaw-zh.tgz          ✅ 16.56 MB
+│   └── openclaw.tgz          ✅ 16.56 MB
 └── download-resources.ps1       ✅ 下载脚本
 ```
 

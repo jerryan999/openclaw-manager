@@ -63,14 +63,14 @@ check: ## Check environment
 	@echo ""
 ifeq ($(DETECTED_OS),Windows)
 	@if exist "$(RESOURCES_DIR)\nodejs\node-windows-x64.zip" (echo Node.js resource: OK) else (echo Node.js resource: MISSING)
-	@if exist "$(RESOURCES_DIR)\openclaw\openclaw-zh.tgz" (echo OpenClaw resource: OK) else (echo OpenClaw resource: MISSING)
+	@if exist "$(RESOURCES_DIR)\openclaw\openclaw.tgz" (echo OpenClaw resource: OK) else (echo OpenClaw resource: MISSING)
 else ifeq ($(DETECTED_OS),macOS)
 	@test -f "$(RESOURCES_DIR)/nodejs/node-macos-arm64.tar.gz" && echo "Node.js ARM64 resource: OK" || echo "Node.js ARM64 resource: MISSING"
 	@test -f "$(RESOURCES_DIR)/nodejs/node-macos-x64.tar.gz" && echo "Node.js x64 resource: OK" || echo "Node.js x64 resource: MISSING"
-	@test -f "$(RESOURCES_DIR)/openclaw/openclaw-zh.tgz" && echo "OpenClaw resource: OK" || echo "OpenClaw resource: MISSING"
+	@test -f "$(RESOURCES_DIR)/openclaw/openclaw.tgz" && echo "OpenClaw resource: OK" || echo "OpenClaw resource: MISSING"
 else
 	@test -f "$(RESOURCES_DIR)/nodejs/node-linux-x64.tar.gz" && echo "Node.js resource: OK" || echo "Node.js resource: MISSING"
-	@test -f "$(RESOURCES_DIR)/openclaw/openclaw-zh.tgz" && echo "OpenClaw resource: OK" || echo "OpenClaw resource: MISSING"
+	@test -f "$(RESOURCES_DIR)/openclaw/openclaw.tgz" && echo "OpenClaw resource: OK" || echo "OpenClaw resource: MISSING"
 endif
 	@echo ""
 
@@ -201,14 +201,14 @@ info: ## Show project info
 	@echo "Resource Status:"
 ifeq ($(DETECTED_OS),Windows)
 	@if exist "$(RESOURCES_DIR)\nodejs\node-windows-x64.zip" (echo   Node.js Windows: Downloaded) else (echo   Node.js Windows: Not downloaded)
-	@if exist "$(RESOURCES_DIR)\openclaw\openclaw-zh.tgz" (echo   OpenClaw: Downloaded) else (echo   OpenClaw: Not downloaded)
+	@if exist "$(RESOURCES_DIR)\openclaw\openclaw.tgz" (echo   OpenClaw: Downloaded) else (echo   OpenClaw: Not downloaded)
 else ifeq ($(DETECTED_OS),macOS)
 	@test -f "$(RESOURCES_DIR)/nodejs/node-macos-arm64.tar.gz" && echo "  Node.js ARM64: Downloaded" || echo "  Node.js ARM64: Not downloaded"
 	@test -f "$(RESOURCES_DIR)/nodejs/node-macos-x64.tar.gz" && echo "  Node.js x64: Downloaded" || echo "  Node.js x64: Not downloaded"
-	@test -f "$(RESOURCES_DIR)/openclaw/openclaw-zh.tgz" && echo "  OpenClaw: Downloaded" || echo "  OpenClaw: Not downloaded"
+	@test -f "$(RESOURCES_DIR)/openclaw/openclaw.tgz" && echo "  OpenClaw: Downloaded" || echo "  OpenClaw: Not downloaded"
 else
 	@test -f "$(RESOURCES_DIR)/nodejs/node-linux-x64.tar.gz" && echo "  Node.js: Downloaded" || echo "  Node.js: Not downloaded"
-	@test -f "$(RESOURCES_DIR)/openclaw/openclaw-zh.tgz" && echo "  OpenClaw: Downloaded" || echo "  OpenClaw: Not downloaded"
+	@test -f "$(RESOURCES_DIR)/openclaw/openclaw.tgz" && echo "  OpenClaw: Downloaded" || echo "  OpenClaw: Not downloaded"
 endif
 	@echo ""
 

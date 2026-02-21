@@ -163,7 +163,7 @@ openclaw-manager/
 │   │   ├── nodejs/
 │   │   │   └── node-windows-x64.zip (33.26 MB) ✅
 │   │   └── openclaw/
-│   │       └── openclaw-zh.tgz (16.56 MB) ✅
+│   │       └── openclaw.tgz (16.56 MB) ✅
 │   ├── src/
 │   │   ├── commands/           # Tauri 命令 ✅
 │   │   ├── utils/

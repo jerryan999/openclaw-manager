@@ -91,7 +91,7 @@ if (Test-Path $nodeResourcePath) {
     $needsResources = $true
 }
 
-$openclawResourcePath = "src-tauri\resources\openclaw\openclaw-zh.tgz"
+$openclawResourcePath = "src-tauri\resources\openclaw\openclaw.tgz"
 if (Test-Path $openclawResourcePath) {
     $size = [math]::Round((Get-Item $openclawResourcePath).Length / 1MB, 2)
     Write-Host "  ✅ OpenClaw 资源: $size MB" -ForegroundColor Green

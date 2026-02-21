@@ -168,7 +168,7 @@ cd src-tauri/resources
 
 # 2. 确认文件存在
 ls -lh nodejs/node-*
-ls -lh openclaw/openclaw-zh.tgz
+ls -lh openclaw/openclaw.tgz
 
 # 3. 构建测试
 npm run tauri:build

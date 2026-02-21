@@ -130,7 +130,7 @@ git push origin v0.0.18
 
 ### 资源文件
 - `src-tauri/resources/nodejs/node-windows-x64.zip` (33.26 MB) ✅
-- `src-tauri/resources/openclaw/openclaw-zh.tgz` (16.56 MB) ✅
+- `src-tauri/resources/openclaw/openclaw.tgz` (16.56 MB) ✅
 
 ---
 

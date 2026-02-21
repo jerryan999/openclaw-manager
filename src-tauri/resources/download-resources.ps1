@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 $NODE_VERSION = "22.12.0"
-$OPENCLAW_PACKAGE = "@jerryan999/openclaw-zh"
+$OPENCLAW_PACKAGE = "openclaw"
 
 Write-Host "=========================================="
 Write-Host "  下载打包资源"
@@ -75,12 +75,12 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
     npm cache verify
     npm pack "$($OPENCLAW_PACKAGE)@latest" --prefer-online
     
-    # 重命名为统一的文件名
-    $tgzFiles = Get-ChildItem "jerryan999-openclaw-zh-*.tgz"
+    # npm pack openclaw 生成 openclaw-<version>.tgz，重命名为统一文件名
+    $tgzFiles = Get-ChildItem "openclaw-*.tgz"
     if ($tgzFiles.Count -gt 0) {
         $tgzFile = $tgzFiles[0]
-        Move-Item -Path $tgzFile.Name -Destination "openclaw-zh.tgz" -Force
-        Write-Host "  ✓ 已保存为: openclaw-zh.tgz"
+        Move-Item -Path $tgzFile.Name -Destination "openclaw.tgz" -Force
+        Write-Host "  ✓ 已保存为: openclaw.tgz"
     }
 } else {
     Write-Host "  ⚠️  npm 未安装，跳过 OpenClaw 下载"

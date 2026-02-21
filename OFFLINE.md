@@ -11,7 +11,7 @@ OpenClaw Manager v0.0.12+ 是**完全离线版本**，内置所有必需组件�
   - macOS x64  
   - Windows x64
 - **OpenClaw 离线包** (~15MB)
-  - @jerryan999/openclaw-zh
+  - openclaw@latest
 
 ### 🎯 用户体验
 
@@ -71,7 +71,7 @@ OpenClaw-Manager.app/
 │       ├── nodejs/
 │       │   └── node-macos-arm64.tar.gz (打包的 Node.js)
 │       └── openclaw/
-│           └── openclaw-zh.tgz (离线安装包)
+│           └── openclaw.tgz (离线安装包)
 ```
 
 ### 安装流程

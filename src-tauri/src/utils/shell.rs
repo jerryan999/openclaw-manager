@@ -22,7 +22,7 @@ const WINDOWS_RUNTIME_DIR: &str = "OpenClawManager\\runtime";
 const NODE_RESOURCE_RELATIVE_PATH: &str = "nodejs\\node-windows-x64.zip";
 
 #[cfg(windows)]
-const OPENCLAW_RESOURCE_RELATIVE_PATH: &str = "openclaw\\openclaw-zh.tgz";
+const OPENCLAW_RESOURCE_RELATIVE_PATH: &str = "openclaw\\openclaw.tgz";
 
 #[cfg(windows)]
 const OFFLINE_NPM_GLOBAL_ZIP_RELATIVE_PATH: &str = "offline\\npm-global.zip";
@@ -430,7 +430,7 @@ fn ensure_windows_openclaw_package(runtime_root: &Path) -> io::Result<PathBuf> {
     let packages_dir = runtime_root.join("packages");
     ensure_dir_all_replace_conflicts(&packages_dir)?;
 
-    let target = packages_dir.join("openclaw-zh.tgz");
+    let target = packages_dir.join("openclaw.tgz");
     if target.exists() {
         return Ok(target);
     }
@@ -438,7 +438,7 @@ fn ensure_windows_openclaw_package(runtime_root: &Path) -> io::Result<PathBuf> {
     let source = find_windows_resource_file(OPENCLAW_RESOURCE_RELATIVE_PATH).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
-            "找不到内置 OpenClaw 资源: resources/openclaw/openclaw-zh.tgz",
+            "找不到内置 OpenClaw 资源: resources/openclaw/openclaw.tgz",
         )
     })?;
     fs::copy(source, &target)?;
@@ -1136,7 +1136,7 @@ pub fn run_openclaw_with_cwd(args: &[&str], cwd: &Path) -> Result<String, String
 
     let openclaw_path = get_openclaw_path().ok_or_else(|| {
         warn!("[Shell] 找不到 openclaw 命令");
-        "找不到 openclaw 命令，请确保已通过 npm install -g @jerryan999/openclaw-zh 安装".to_string()
+        "找不到 openclaw 命令，请确保已通过 npm install -g openclaw@latest 安装".to_string()
     })?;
 
     let extended_path = get_extended_path();
@@ -1183,7 +1183,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
 
     let openclaw_path = get_openclaw_path().ok_or_else(|| {
         warn!("[Shell] 找不到 openclaw 命令");
-        "找不到 openclaw 命令，请确保已通过 npm install -g @jerryan999/openclaw-zh 安装".to_string()
+        "找不到 openclaw 命令，请确保已通过 npm install -g openclaw@latest 安装".to_string()
     })?;
 
     debug!("[Shell] openclaw 路径: {}", openclaw_path);
@@ -1276,7 +1276,7 @@ pub fn spawn_openclaw_gateway() -> io::Result<()> {
         warn!("[Shell] 找不到 openclaw 命令");
         io::Error::new(
             io::ErrorKind::NotFound,
-            "找不到 openclaw 命令，请确保已通过 npm install -g @jerryan999/openclaw-zh 安装",
+            "找不到 openclaw 命令，请确保已通过 npm install -g openclaw@latest 安装",
         )
     })?;
 

@@ -2,7 +2,7 @@
 
 高性能跨平台 AI 助手管理工具，基于 **Tauri 2.0 + React + TypeScript + Rust** 构建。
 
-> **✨ 本项目使用 [jerryan999/OpenClawChinese](https://github.com/jerryan999/OpenClawChinese) 无广告中文版。**
+> **✨ 本项目使用官方 [OpenClaw](https://www.npmjs.com/package/openclaw)（openclaw@latest）。**
 
 > **🎁 v0.0.12+ 为完全离线版：内置 Node.js + OpenClaw，开箱即用，无需任何配置！** [查看详情](OFFLINE.md)
 
@@ -276,7 +276,7 @@ openclaw-manager/
 Windows 版支持离线运行时打包。打包时会把 `src-tauri/resources/**` 一并放入安装包，并在首次运行自动解压到本地运行时目录。
 
 - 内置 Node.js：`src-tauri/resources/nodejs/node-windows-x64.zip`
-- 内置 OpenClaw 包：`src-tauri/resources/openclaw/openclaw-zh.tgz`
+- 内置 OpenClaw 包：`src-tauri/resources/openclaw/openclaw.tgz`
 - 预装 OpenClaw 运行时：`src-tauri/resources/offline/npm-global.zip`（由 GitHub Actions 在 Windows 构建时自动生成）
 - 可选内置 Git（便携版 zip）：放到 `src-tauri/resources/git/`，支持文件名：
   - `git-portable.zip`
@@ -353,7 +353,7 @@ MIT License - 详见 [LICENSE](LICENSE)
 
 - [OpenClaw Manager](https://github.com/miaoxworld/openclaw-manager) - 图形界面版本（本项目）
 - [OpenClawInstaller](https://github.com/miaoxworld/OpenClawInstaller) - 命令行版本
-- [OpenClaw 中文版](https://github.com/jerryan999/OpenClawChinese) - 本项目使用的 OpenClaw 中文版
+- [OpenClaw](https://www.npmjs.com/package/openclaw) - 本项目使用的官方 OpenClaw（npm openclaw@latest）
 - [OpenClaw 插件文档](https://docs.clawd.bot/plugins) - 官方插件文档
 - [Tauri 官方文档](https://tauri.app/)
 - [React 官方文档](https://react.dev/)

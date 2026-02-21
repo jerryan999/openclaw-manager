@@ -14,7 +14,7 @@ resources/
 ├── git/              # Portable Git（仅 Windows，可选）
 │   └── git-portable.zip      # 或 PortableGit.zip（须为 .zip）
 └── openclaw/         # OpenClaw npm 包（离线安装）
-    └── openclaw-zh.tgz   # 打包的 npm 包
+    └── openclaw.tgz      # 打包的 npm 包（官方 openclaw@latest）
 ```
 
 ## 下载资源
@@ -47,13 +47,12 @@ curl -o src-tauri/resources/nodejs/node-linux-x64.tar.gz \
 # 创建目录
 mkdir -p src-tauri/resources/openclaw
 
-# 下载并打包 OpenClaw（不需要 Git）
+# 下载并打包 OpenClaw（官方版，不需要 Git）
 cd src-tauri/resources/openclaw
-npm pack @jerryan999/openclaw-zh
+npm pack openclaw@latest
 
-# 生成的文件类似：jerryan999-openclaw-zh-1.0.0.tgz
-# 重命名为统一的名字
-mv jerryan999-openclaw-zh-*.tgz openclaw-zh.tgz
+# 生成的文件类似：openclaw-1.0.0.tgz，重命名为统一名字
+mv openclaw-*.tgz openclaw.tgz
 ```
 
 ### 3. Portable Git（可选，仅 Windows）

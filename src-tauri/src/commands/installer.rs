@@ -778,7 +778,7 @@ fn get_bundled_openclaw_package_with_app(app: &tauri::AppHandle) -> Option<Strin
     ];
     
     for dir in resource_dirs {
-        let path = std::path::Path::new(dir).join("openclaw-zh.tgz");
+        let path = std::path::Path::new(dir).join("openclaw.tgz");
         if path.is_file() {
             let path_str = path.display().to_string();
             info!("[安装OpenClaw] 找到本地离线包: {}", path_str);
@@ -986,7 +986,7 @@ $env:npm_config_prefix = $runtimePrefix
 $env:NPM_CONFIG_PREFIX = $runtimePrefix
 Write-Host ("npm: " + $npmCmd)
 & $npmCmd config get prefix | ForEach-Object {{ Write-Host ("npm prefix(before): " + $_) }}
-& $npmCmd install -g @jerryan999/openclaw-zh --prefix "$runtimePrefix" --unsafe-perm --no-audit --fund=false --loglevel=error
+& $npmCmd install -g openclaw@latest --prefix "$runtimePrefix" --unsafe-perm --no-audit --fund=false --loglevel=error
 & $npmCmd config get prefix | ForEach-Object {{ Write-Host ("npm prefix(after): " + $_) }}
 & $npmCmd root -g | ForEach-Object {{ Write-Host ("npm root -g: " + $_) }}
 
@@ -1096,7 +1096,7 @@ if ! command -v node &> /dev/null; then
 fi
 
 echo "使用 npm 在线安装 OpenClaw..."
-npm install -g @jerryan999/openclaw-zh --unsafe-perm
+npm install -g openclaw@latest --unsafe-perm
 
 # 刷新命令缓存
 hash -r 2>/dev/null || true
@@ -1697,8 +1697,8 @@ Write-Host "    OpenClaw 安装向导" -ForegroundColor White
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-Write-Host "正在安装 OpenClaw 中文版（无广告版）..." -ForegroundColor Yellow
-npm install -g @jerryan999/openclaw-zh
+Write-Host "正在安装 OpenClaw（官方版）..." -ForegroundColor Yellow
+npm install -g openclaw@latest
 
 Write-Host ""
 Write-Host "初始化配置..."
@@ -1721,8 +1721,8 @@ echo "    OpenClaw 安装向导"
 echo "========================================"
 echo ""
 
-echo "正在安装 OpenClaw 中文版（无广告版）..."
-npm install -g @jerryan999/openclaw-zh
+echo "正在安装 OpenClaw（官方版）..."
+npm install -g openclaw@latest
 
 # 刷新命令缓存，确保能找到新安装的 openclaw 命令
 hash -r 2>/dev/null || true
@@ -1766,8 +1766,8 @@ echo "    OpenClaw 安装向导"
 echo "========================================"
 echo ""
 
-echo "正在安装 OpenClaw 中文版（无广告版）..."
-npm install -g @jerryan999/openclaw-zh
+echo "正在安装 OpenClaw（官方版）..."
+npm install -g openclaw@latest
 
 # 刷新命令缓存，确保能找到新安装的 openclaw 命令
 hash -r 2>/dev/null || true
@@ -1808,7 +1808,7 @@ read -p "按回车键关闭..."
             }
         }
 
-        Err("无法启动终端，请手动运行: npm install -g @jerryan999/openclaw-zh".to_string())
+        Err("无法启动终端，请手动运行: npm install -g openclaw@latest".to_string())
     }
 }
 
@@ -1847,9 +1847,9 @@ pub async fn uninstall_openclaw() -> Result<InstallResult, String> {
 /// Windows 卸载 OpenClaw
 async fn uninstall_openclaw_windows() -> Result<InstallResult, String> {
     // 使用 cmd.exe 执行 npm uninstall，避免 PowerShell 执行策略问题
-    info!("[卸载OpenClaw] 执行 npm uninstall -g @jerryan999/openclaw-zh...");
+    info!("[卸载OpenClaw] 执行 npm uninstall -g openclaw...");
 
-    match shell::run_cmd_output("npm uninstall -g @jerryan999/openclaw-zh") {
+    match shell::run_cmd_output("npm uninstall -g openclaw") {
         Ok(output) => {
             info!("[卸载OpenClaw] npm 输出: {}", output);
 
@@ -1904,7 +1904,7 @@ async fn uninstall_openclaw_unix() -> Result<InstallResult, String> {
         // 使用与 openclaw 同目录的 npm，确保从正确的全局空间卸载（如 nvm 安装的包）
         format!(
             r#"echo "卸载 OpenClaw..."
-'{}' uninstall -g @jerryan999/openclaw-zh
+'{}' uninstall -g openclaw
 
 # 验证卸载
 if command -v openclaw &> /dev/null; then
@@ -1919,7 +1919,7 @@ fi"#,
     } else {
         info!("[卸载OpenClaw] 在登录 shell 中执行 npm uninstall（使用用户环境）");
         r#"echo "卸载 OpenClaw..."
-npm uninstall -g @jerryan999/openclaw-zh
+npm uninstall -g openclaw
 
 # 验证卸载
 if command -v openclaw &> /dev/null; then
@@ -2015,9 +2015,9 @@ pub async fn check_openclaw_update() -> Result<UpdateInfo, String> {
 fn get_latest_openclaw_version() -> Option<String> {
     // 使用 npm view 获取最新版本
     let result = if platform::is_windows() {
-        shell::run_cmd_output("npm view @jerryan999/openclaw-zh version")
+        shell::run_cmd_output("npm view openclaw version")
     } else {
-        shell::run_bash_output("npm view @jerryan999/openclaw-zh version 2>/dev/null")
+        shell::run_bash_output("npm view openclaw version 2>/dev/null")
     };
 
     match result {
@@ -2168,9 +2168,9 @@ pub async fn update_openclaw() -> Result<InstallResult, String> {
 
 /// Windows 更新 OpenClaw
 async fn update_openclaw_windows() -> Result<InstallResult, String> {
-    info!("[更新OpenClaw] 执行 npm install -g @jerryan999/openclaw-zh...");
+    info!("[更新OpenClaw] 执行 npm install -g openclaw@latest...");
 
-    match shell::run_cmd_output("npm install -g @jerryan999/openclaw-zh") {
+    match shell::run_cmd_output("npm install -g openclaw@latest") {
         Ok(output) => {
             info!("[更新OpenClaw] npm 输出: {}", output);
 
@@ -2201,7 +2201,7 @@ async fn update_openclaw_windows() -> Result<InstallResult, String> {
 async fn update_openclaw_unix() -> Result<InstallResult, String> {
     let script = r#"
 echo "更新 OpenClaw..."
-npm install -g @jerryan999/openclaw-zh
+npm install -g openclaw@latest
 
 # 验证更新
 openclaw --version

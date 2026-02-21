@@ -124,7 +124,7 @@ ls src-tauri/resources/openclaw
 
 应该看到:
 - `nodejs/node-windows-x64.zip` (33.26 MB)
-- `openclaw/openclaw-zh.tgz` (16.56 MB)
+- `openclaw/openclaw.tgz` (16.56 MB)
 
 如果没有，运行:
 ```powershell
@@ -284,7 +284,7 @@ if (Test-Path "src-tauri/resources/nodejs/node-windows-x64.zip") {
     Write-Host "  ❌ Node.js 资源未下载" -ForegroundColor Red
 }
 
-if (Test-Path "src-tauri/resources/openclaw/openclaw-zh.tgz") {
+if (Test-Path "src-tauri/resources/openclaw/openclaw.tgz") {
     Write-Host "  ✅ OpenClaw 资源已下载" -ForegroundColor Green
 } else {
     Write-Host "  ❌ OpenClaw 资源未下载" -ForegroundColor Red

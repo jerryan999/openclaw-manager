@@ -5,7 +5,7 @@ set -e
 # 用于 CI/CD 或本地开发
 
 NODE_VERSION="22.12.0"
-OPENCLAW_PACKAGE="@jerryan999/openclaw-zh"
+OPENCLAW_PACKAGE="openclaw"
 GIT_VERSION="2.53.0"
 
 echo "=========================================="
@@ -99,32 +99,16 @@ if command -v npm &> /dev/null; then
   echo "  使用 npm pack 打包..."
   rm -f *.tgz
 
-  case "$OS-$ARCH" in
-    darwin-arm64)
-      OPENCLAW_TGZ="openclaw-macos-arm64.tgz"
-      ;;
-    darwin-x86_64)
-      OPENCLAW_TGZ="openclaw-macos-x64.tgz"
-      ;;
-    linux-x86_64)
-      OPENCLAW_TGZ="openclaw-linux-x64.tgz"
-      ;;
-    *)
-      OPENCLAW_TGZ="openclaw-unknown.tgz"
-      ;;
-  esac
-
   # 强制清除缓存并从 registry 获取最新版本
   npm cache clean --force 2>/dev/null || true
-  npm pack "$OPENCLAW_PACKAGE@latest" --prefer-online
-  
-  # 重命名为按平台区分的文件名，并保留兼容文件名
-  for file in jerryan999-openclaw-zh-*.tgz; do
+  npm pack "${OPENCLAW_PACKAGE}@latest" --prefer-online
+
+  # npm pack openclaw 生成 openclaw-<version>.tgz，重命名为统一文件名
+  for file in openclaw-*.tgz; do
     if [ -f "$file" ]; then
-      mv "$file" "$OPENCLAW_TGZ"
-      cp "$OPENCLAW_TGZ" openclaw-zh.tgz
-      echo "  ✓ 已保存为: $OPENCLAW_TGZ"
-      echo "  ✓ 兼容副本: openclaw-zh.tgz"
+      mv "$file" openclaw.tgz
+      echo "  ✓ 已保存为: openclaw.tgz"
+      break
     fi
   done
 else

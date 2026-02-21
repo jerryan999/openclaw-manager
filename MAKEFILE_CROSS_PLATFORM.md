@@ -47,16 +47,16 @@ endif
 
 #### Windows
 - `nodejs/node-windows-x64.zip` (33 MB)
-- `openclaw/openclaw-zh.tgz` (17 MB)
+- `openclaw/openclaw.tgz` (17 MB)
 
 #### macOS
 - `nodejs/node-macos-arm64.tar.gz` (ARM64, 40 MB)
 - `nodejs/node-macos-x64.tar.gz` (x64, 42 MB)
-- `openclaw/openclaw-zh.tgz` (17 MB)
+- `openclaw/openclaw.tgz` (17 MB)
 
 #### Linux
 - `nodejs/node-linux-x64.tar.gz` (44 MB)
-- `openclaw/openclaw-zh.tgz` (17 MB)
+- `openclaw/openclaw.tgz` (17 MB)
 
 ### 构建产物
 

@@ -70,7 +70,7 @@ pub fn has_bundled_nodejs(app_handle: &tauri::AppHandle) -> bool {
     get_resource_path(app_handle, resource_name).is_some()
 }
 
-/// 检查是否有打包的 OpenClaw（仅认 openclaw-zh.tgz）
+/// 检查是否有打包的 OpenClaw（仅认 openclaw.tgz）
 pub fn has_bundled_openclaw(app_handle: &tauri::AppHandle) -> bool {
     get_bundled_openclaw_package(app_handle).is_some()
 }
@@ -122,10 +122,10 @@ pub async fn extract_bundled_nodejs(
     Ok(node_bin)
 }
 
-/// 获取打包的 OpenClaw npm 包路径（仅认 openclaw-zh.tgz，与 download 脚本一致）
+/// 获取打包的 OpenClaw npm 包路径（仅认 openclaw.tgz，与 download 脚本一致）
 pub fn get_bundled_openclaw_package(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
     let openclaw_dir = get_resource_path(app_handle, "openclaw")?;
-    let path = openclaw_dir.join("openclaw-zh.tgz");
+    let path = openclaw_dir.join("openclaw.tgz");
     if path.is_file() {
         info!("[资源] 找到 OpenClaw 包: {:?}", path);
         return Some(path);
