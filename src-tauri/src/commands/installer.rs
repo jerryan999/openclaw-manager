@@ -1145,7 +1145,10 @@ Write-Host "[提示] 可继续手动执行命令排查问题。" -ForegroundColo
 "#
         .replace("__RUNTIME_PATH__", &rt_path.replace('"', "`\""));
         let tmp = std::env::temp_dir().join("openclaw_debug_terminal.ps1");
-        std::fs::write(&tmp, &script_body).map_err(|e| format!("写入脚本失败: {}", e))?;
+        // UTF-8 BOM 让 PowerShell 正确识别编码，避免中文被系统编码误解析导致 "缺少字符串终止符"
+        const UTF8_BOM: &[u8] = b"\xEF\xBB\xBF";
+        let with_bom = [UTF8_BOM, script_body.as_bytes()].concat();
+        std::fs::write(&tmp, &with_bom).map_err(|e| format!("写入脚本失败: {}", e))?;
         // 直接用 Command 启动 powershell -File <path>，避免通过 -Command 传参导致的路径/引号解析问题
         std::process::Command::new("powershell")
             .args(["-NoExit", "-ExecutionPolicy", "Bypass", "-File"])
