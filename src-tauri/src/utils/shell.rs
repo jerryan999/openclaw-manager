@@ -169,6 +169,48 @@ fn zip_err_to_io(err: zip::result::ZipError) -> io::Error {
 }
 
 #[cfg(windows)]
+fn remove_path_if_exists(path: &Path) -> io::Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    if path.is_dir() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    }
+}
+
+#[cfg(windows)]
+fn ensure_dir_all_replace_conflicts(path: &Path) -> io::Result<()> {
+    use std::path::Component;
+
+    let mut current = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir => {
+                current.push(component.as_os_str());
+            }
+            Component::CurDir => {}
+            Component::ParentDir => {
+                current.push(component.as_os_str());
+            }
+            Component::Normal(segment) => {
+                current.push(segment);
+                if current.exists() {
+                    if !current.is_dir() {
+                        remove_path_if_exists(&current)?;
+                        fs::create_dir(&current)?;
+                    }
+                } else {
+                    fs::create_dir(&current)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
 fn get_windows_runtime_root() -> PathBuf {
     if let Some(local) = dirs::data_local_dir() {
         return local.join(WINDOWS_RUNTIME_DIR);
@@ -242,7 +284,7 @@ fn find_windows_resource_dir(relative: &str) -> Option<PathBuf> {
 
 #[cfg(windows)]
 fn extract_zip(zip_path: &Path, output_dir: &Path) -> io::Result<()> {
-    fs::create_dir_all(output_dir)?;
+    ensure_dir_all_replace_conflicts(output_dir)?;
     let file = fs::File::open(zip_path)?;
     let mut archive = zip::ZipArchive::new(file).map_err(zip_err_to_io)?;
 
@@ -253,7 +295,7 @@ fn extract_zip(zip_path: &Path, output_dir: &Path) -> io::Result<()> {
             if out_path.exists() && !out_path.is_dir() {
                 fs::remove_file(&out_path)?;
             }
-            fs::create_dir_all(&out_path)?;
+            ensure_dir_all_replace_conflicts(&out_path)?;
             continue;
         }
 
@@ -261,7 +303,7 @@ fn extract_zip(zip_path: &Path, output_dir: &Path) -> io::Result<()> {
             if parent.exists() && !parent.is_dir() {
                 fs::remove_file(parent)?;
             }
-            fs::create_dir_all(parent)?;
+            ensure_dir_all_replace_conflicts(parent)?;
         }
         if out_path.exists() && out_path.is_dir() {
             fs::remove_dir_all(&out_path)?;
@@ -315,7 +357,7 @@ fn find_top_level_dir_containing_file(root: &Path, file_name: &str) -> Option<Pa
 
 #[cfg(windows)]
 fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
-    fs::create_dir_all(dst)?;
+    ensure_dir_all_replace_conflicts(dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let src_path = entry.path();
@@ -382,7 +424,7 @@ fn ensure_windows_node_runtime(runtime_root: &Path) -> io::Result<PathBuf> {
 #[cfg(windows)]
 fn ensure_windows_openclaw_package(runtime_root: &Path) -> io::Result<PathBuf> {
     let packages_dir = runtime_root.join("packages");
-    fs::create_dir_all(&packages_dir)?;
+    ensure_dir_all_replace_conflicts(&packages_dir)?;
 
     let target = packages_dir.join("openclaw-zh.tgz");
     if target.exists() {
@@ -522,7 +564,7 @@ fn ensure_windows_git_runtime(runtime_root: &Path) -> io::Result<Option<PathBuf>
 
     let extract_root = runtime_root.join("tmp-git-extract");
     if extract_root.exists() {
-        fs::remove_dir_all(&extract_root)?;
+        remove_path_if_exists(&extract_root)?;
     }
     extract_zip(&git_zip, &extract_root)?;
 
@@ -543,7 +585,7 @@ fn ensure_windows_git_runtime(runtime_root: &Path) -> io::Result<Option<PathBuf>
             "Git 压缩包中未找到 git.exe",
         ));
     }
-    fs::create_dir_all(&git_root)?;
+    ensure_dir_all_replace_conflicts(&git_root)?;
     if top_level.len() == 1 {
         let only = top_level[0].path();
         if only.is_dir() {
@@ -633,7 +675,8 @@ pub fn ensure_windows_git_if_bundled() -> Option<PathBuf> {
 #[cfg(windows)]
 pub fn get_windows_offline_runtime() -> Result<WindowsOfflineRuntime, String> {
     let runtime_root = get_windows_runtime_root();
-    fs::create_dir_all(&runtime_root).map_err(|e| format!("创建离线运行时目录失败: {}", e))?;
+    ensure_dir_all_replace_conflicts(&runtime_root)
+        .map_err(|e| format!("创建离线运行时目录失败: {}", e))?;
 
     let node_dir = ensure_windows_node_runtime(&runtime_root)
         .map_err(|e| format!("准备离线 Node.js 失败: {}", e))?;
