@@ -900,19 +900,12 @@ $runtimeOpenClawCmd = "{}"
 $runtimeOpenClawCmdBin = "{}"
 $runtimeNpmCmd = "{}"
 $runtimeNodeExe = "{}"
+$env:Path = ([IO.Path]::GetDirectoryName($runtimeNpmCmd)) + ";" + $env:Path
 
-# 选择 npm（优先 runtime，其次系统）
-$npmCmd = $null
-if (Test-Path $runtimeNpmCmd) {{
-    $npmCmd = $runtimeNpmCmd
-}} else {{
-    $npmResolved = Get-Command npm -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($npmResolved -and $npmResolved.Source) {{
-        $npmCmd = $npmResolved.Source
-    }}
-}}
-if (-not $npmCmd) {{
-    Write-Host "错误：未找到 npm（runtime 与系统均不可用）"
+# 仅使用 runtime npm，避免误用系统 npm
+$npmCmd = $runtimeNpmCmd
+if (-not (Test-Path $npmCmd)) {{
+    Write-Host ("错误：未找到 runtime npm: " + $npmCmd)
     exit 1
 }}
 
@@ -962,19 +955,12 @@ $runtimeOpenClawCmd = "{}"
 $runtimeOpenClawCmdBin = "{}"
 $runtimeNpmCmd = "{}"
 $runtimeNodeExe = "{}"
+$env:Path = ([IO.Path]::GetDirectoryName($runtimeNpmCmd)) + ";" + $env:Path
 
-# 选择 npm（优先 runtime，其次系统）
-$npmCmd = $null
-if (Test-Path $runtimeNpmCmd) {{
-    $npmCmd = $runtimeNpmCmd
-}} else {{
-    $npmResolved = Get-Command npm -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($npmResolved -and $npmResolved.Source) {{
-        $npmCmd = $npmResolved.Source
-    }}
-}}
-if (-not $npmCmd) {{
-    Write-Host "错误：未找到 npm（runtime 与系统均不可用）"
+# 仅使用 runtime npm，避免误用系统 npm
+$npmCmd = $runtimeNpmCmd
+if (-not (Test-Path $npmCmd)) {{
+    Write-Host ("错误：未找到 runtime npm: " + $npmCmd)
     exit 1
 }}
 
