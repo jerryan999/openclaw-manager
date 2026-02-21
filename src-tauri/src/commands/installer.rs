@@ -964,10 +964,10 @@ New-Item -ItemType Directory -Path $runtimePrefix -Force | Out-Null
 $env:npm_config_prefix = $runtimePrefix
 $env:NPM_CONFIG_PREFIX = $runtimePrefix
 Write-Host ("npm: " + $npmCmd)
-& $npmCmd config get prefix | ForEach-Object { Write-Host ("npm prefix(before): " + $_) }
+& $npmCmd config get prefix | ForEach-Object {{ Write-Host ("npm prefix(before): " + $_) }}
 & $npmCmd install -g @jerryan999/openclaw-zh --prefix "$runtimePrefix" --unsafe-perm --no-audit --fund=false --loglevel=error
-& $npmCmd config get prefix | ForEach-Object { Write-Host ("npm prefix(after): " + $_) }
-& $npmCmd root -g | ForEach-Object { Write-Host ("npm root -g: " + $_) }
+& $npmCmd config get prefix | ForEach-Object {{ Write-Host ("npm prefix(after): " + $_) }}
+& $npmCmd root -g | ForEach-Object {{ Write-Host ("npm root -g: " + $_) }}
 
 # 刷新 PATH
 $npmPrefix = $runtimePrefix
