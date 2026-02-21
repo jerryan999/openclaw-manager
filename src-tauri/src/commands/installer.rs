@@ -92,9 +92,16 @@ pub async fn check_environment(app: tauri::AppHandle) -> Result<EnvironmentStatu
     let (openclaw_installed, openclaw_version, openclaw_path) = if platform::is_windows() {
         let runtime_path = get_windows_runtime_openclaw_path();
         let runtime_version = get_windows_runtime_openclaw_version(runtime_path.as_deref());
-        let system_version = get_openclaw_version();
-        let system_path = shell::get_openclaw_path();
-
+        // 已有 runtime 版本时不再调用 get_openclaw_version/get_openclaw_path，避免重复触发
+        // get_windows_offline_runtime 与 run_openclaw，显著加快环境检查
+        let (system_version, system_path) = if runtime_version.is_some() {
+            (None as Option<String>, None as Option<String>)
+        } else {
+            (
+                get_openclaw_version(),
+                shell::get_openclaw_path(),
+            )
+        };
         info!(
             "[环境检查] OpenClaw(Windows): runtime_version={:?}, runtime_path={:?}, system_version={:?}, system_path={:?}",
             runtime_version, runtime_path, system_version, system_path
@@ -1690,28 +1697,59 @@ read -p "按回车键关闭此窗口..."
 /// 打开终端安装 OpenClaw
 async fn open_openclaw_install_terminal() -> Result<String, String> {
     if platform::is_windows() {
-        let script = r#"
-Start-Process powershell -ArgumentList '-NoExit', '-Command', '
+        let rt_path = get_windows_runtime_root_path()
+            .display()
+            .to_string()
+            .replace('"', "`\"");
+        // 必须使用 runtime 里的 npm 并安装到 runtime npm-global，否则应用内检测不到
+        let script = format!(
+            r#"
+Start-Process powershell -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', '
+$rt = "{0}"
+$runtimeNode = [IO.Path]::Combine($rt, "node")
+$runtimeNpmCmd = [IO.Path]::Combine($rt, "node", "npm.cmd")
+$runtimePrefix = [IO.Path]::Combine($rt, "npm-global")
+$env:PATH = "$runtimeNode;$runtimePrefix;$env:PATH"
+
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "    OpenClaw 安装向导" -ForegroundColor White
+Write-Host "    OpenClaw 安装向导（使用 runtime npm）" -ForegroundColor White
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-Write-Host "正在安装 OpenClaw（官方版）..." -ForegroundColor Yellow
-npm install -g openclaw@latest
+if (-not (Test-Path $runtimeNpmCmd)) {{
+    Write-Host "错误：未找到 runtime npm，请先在应用内完成 Node 安装。" -ForegroundColor Red
+    Read-Host "按回车键关闭此窗口"
+    exit 1
+}}
+
+Write-Host "正在使用 runtime npm 安装 OpenClaw 到 runtime..." -ForegroundColor Yellow
+Write-Host ("npm: " + $runtimeNpmCmd)
+Write-Host ("prefix: " + $runtimePrefix)
+New-Item -ItemType Directory -Path $runtimePrefix -Force | Out-Null
+& $runtimeNpmCmd install -g openclaw@latest --prefix $runtimePrefix --no-audit --fund=false --loglevel=error
 
 Write-Host ""
 Write-Host "初始化配置..."
-openclaw config set gateway.mode local
+& ([IO.Path]::Combine($runtimePrefix, "openclaw.cmd")) config set gateway.mode local 2>$null
+if (-not $?) {{
+    $binCmd = [IO.Path]::Combine($runtimePrefix, "node_modules", ".bin", "openclaw.cmd")
+    if (Test-Path $binCmd) {{ & $binCmd config set gateway.mode local 2>$null }}
+}}
 
 Write-Host ""
 Write-Host "安装完成！" -ForegroundColor Green
-openclaw --version
+$ocCmd = [IO.Path]::Combine($runtimePrefix, "openclaw.cmd")
+$ocBin = [IO.Path]::Combine($runtimePrefix, "node_modules", ".bin", "openclaw.cmd")
+if (Test-Path $ocCmd) {{ & $ocCmd --version }}
+elseif (Test-Path $ocBin) {{ & $ocBin --version }}
+else {{ Write-Host "openclaw: 未在 runtime 中找到" }}
 Write-Host ""
 Read-Host "按回车键关闭此窗口"
 '
-"#;
-        shell::run_powershell_output(script)?;
+"#,
+            rt_path
+        );
+        shell::run_powershell_output(&script)?;
         Ok("已打开安装终端".to_string())
     } else if platform::is_macos() {
         let script_content = r#"#!/bin/bash

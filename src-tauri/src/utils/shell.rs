@@ -448,7 +448,13 @@ fn ensure_windows_openclaw_package(runtime_root: &Path) -> io::Result<PathBuf> {
 #[cfg(windows)]
 fn ensure_windows_preinstalled_npm_prefix(runtime_root: &Path) -> io::Result<PathBuf> {
     let npm_prefix = runtime_root.join("npm-global");
-    if npm_prefix.join("openclaw.cmd").exists() {
+    // npm 在 Windows 上可能只创建 node_modules/.bin/openclaw.cmd，不创建根目录 openclaw.cmd
+    let openclaw_at_root = npm_prefix.join("openclaw.cmd");
+    let openclaw_in_bin = npm_prefix
+        .join("node_modules")
+        .join(".bin")
+        .join("openclaw.cmd");
+    if openclaw_at_root.exists() || openclaw_in_bin.exists() {
         return Ok(npm_prefix);
     }
 
@@ -702,7 +708,18 @@ pub fn get_windows_offline_runtime() -> Result<WindowsOfflineRuntime, String> {
     let npm_prefix = ensure_windows_preinstalled_npm_prefix(&runtime_root)
         .map_err(|e| format!("准备预装 OpenClaw 运行时失败: {}", e))?;
 
-    let openclaw_cmd = npm_prefix.join("openclaw.cmd");
+    // npm 在 Windows 上可能只创建 node_modules/.bin/openclaw.cmd
+    let openclaw_cmd_bin = npm_prefix
+        .join("node_modules")
+        .join(".bin")
+        .join("openclaw.cmd");
+    let openclaw_cmd = if npm_prefix.join("openclaw.cmd").exists() {
+        npm_prefix.join("openclaw.cmd")
+    } else if openclaw_cmd_bin.exists() {
+        openclaw_cmd_bin
+    } else {
+        npm_prefix.join("openclaw.cmd")
+    };
     Ok(WindowsOfflineRuntime {
         node_dir,
         npm_prefix,
