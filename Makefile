@@ -195,7 +195,7 @@ endif
 info: ## Show project info
 	@echo ""
 	@echo "Project: OpenClaw Manager"
-	@echo "Version: 0.0.25"
+	@echo "Version: 0.0.27"
 	@echo "Platform: $(DETECTED_OS)"
 	@echo ""
 	@echo "Resource Status:"

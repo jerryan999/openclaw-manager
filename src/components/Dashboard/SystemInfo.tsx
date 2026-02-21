@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Monitor, Package, Folder, CheckCircle, XCircle } from 'lucide-react';
+import { Monitor, Folder, CheckCircle, XCircle, Smartphone } from 'lucide-react';
 import { api, SystemInfo as SystemInfoType, isTauri } from '../../lib/tauri';
 
 interface SystemInfoProps {
@@ -8,6 +8,7 @@ interface SystemInfoProps {
 
 export function SystemInfo({ refreshToken }: SystemInfoProps) {
   const [info, setInfo] = useState<SystemInfoType | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,8 +19,12 @@ export function SystemInfo({ refreshToken }: SystemInfoProps) {
         return;
       }
       try {
-        const result = await api.getSystemInfo();
-        setInfo(result);
+        const [systemInfo, version] = await Promise.all([
+          api.getSystemInfo(),
+          api.getAppVersion(),
+        ]);
+        setInfo(systemInfo);
+        setAppVersion(version);
       } catch {
         // 静默处理
       } finally {
@@ -74,6 +79,19 @@ export function SystemInfo({ refreshToken }: SystemInfoProps) {
           </div>
         </div>
 
+        {/* OpenClaw Manager 本应用版本 */}
+        {appVersion && (
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-dark-500 flex items-center justify-center">
+              <Smartphone size={16} className="text-gray-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs text-gray-500">OpenClaw Manager</p>
+              <p className="text-sm text-white">v{appVersion}</p>
+            </div>
+          </div>
+        )}
+
         {/* OpenClaw */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-dark-500 flex items-center justify-center">
@@ -90,17 +108,6 @@ export function SystemInfo({ refreshToken }: SystemInfoProps) {
                 ? info.openclaw_version || '已安装'
                 : '未安装'}
             </p>
-          </div>
-        </div>
-
-        {/* Node.js */}
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-dark-500 flex items-center justify-center">
-            <Package size={16} className="text-green-500" />
-          </div>
-          <div className="flex-1">
-            <p className="text-xs text-gray-500">Node.js</p>
-            <p className="text-sm text-white">{info?.node_version || '--'}</p>
           </div>
         </div>
 

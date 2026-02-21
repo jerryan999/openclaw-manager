@@ -32,6 +32,12 @@ fn save_openclaw_config(config: &Value) -> Result<(), String> {
     file::write_file(&config_path, &content).map_err(|e| format!("写入配置文件失败: {}", e))
 }
 
+/// 获取本应用（OpenClaw Manager）版本号
+#[command]
+pub fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 /// 获取完整配置
 #[command]
 pub async fn get_config() -> Result<Value, String> {

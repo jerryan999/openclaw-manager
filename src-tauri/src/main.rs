@@ -14,7 +14,10 @@ fn main() {
     // 初始化日志 - 默认显示 info 级别日志
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    log::info!("🦞 OpenClaw Manager 启动");
+    log::info!(
+        "🦞 OpenClaw Manager 启动 (v{})",
+        env!("CARGO_PKG_VERSION")
+    );
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -33,6 +36,7 @@ fn main() {
             process::get_openclaw_version,
             process::check_port_in_use,
             // 配置管理
+            config::get_app_version,
             config::get_config,
             config::save_config,
             config::get_env_value,
