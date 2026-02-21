@@ -556,6 +556,22 @@ fn get_windows_runtime_openclaw_version(path: Option<&str>) -> Option<String> {
     shell::run_cmd_output(&cmd).ok().map(|v| v.trim().to_string())
 }
 
+fn get_windows_runtime_npm_path() -> Option<String> {
+    if let Ok(runtime) = shell::get_windows_offline_runtime() {
+        let npm_cmd = runtime.node_dir.join("npm.cmd");
+        if npm_cmd.exists() {
+            return Some(npm_cmd.display().to_string());
+        }
+    }
+
+    let npm_cmd = get_windows_runtime_root_path().join("node").join("npm.cmd");
+    if npm_cmd.exists() {
+        return Some(npm_cmd.display().to_string());
+    }
+
+    None
+}
+
 /// 检查 Node.js 版本是否 >= 22
 fn check_node_version_requirement(version: &Option<String>) -> bool {
     if let Some(v) = version {
@@ -1994,7 +2010,12 @@ pub async fn check_openclaw_update() -> Result<UpdateInfo, String> {
     info!("[版本检查] 开始检查 OpenClaw 更新...");
 
     // 获取当前版本
-    let current_version = get_openclaw_version();
+    let current_version = if platform::is_windows() {
+        let runtime_path = get_windows_runtime_openclaw_path();
+        get_windows_runtime_openclaw_version(runtime_path.as_deref())
+    } else {
+        get_openclaw_version()
+    };
     info!("[版本检查] 当前版本: {:?}", current_version);
 
     if current_version.is_none() {
@@ -2037,9 +2058,16 @@ pub async fn check_openclaw_update() -> Result<UpdateInfo, String> {
 
 /// 获取 npm registry 上的最新版本
 fn get_latest_openclaw_version() -> Option<String> {
-    // 使用 npm view 获取最新版本
     let result = if platform::is_windows() {
-        shell::run_cmd_output("npm view openclaw version")
+        // Windows 仅使用 runtime npm，避免误读系统环境
+        let Some(runtime_npm) = get_windows_runtime_npm_path() else {
+            warn!("[版本检查] Windows runtime npm 不存在，跳过最新版本检查");
+            return None;
+        };
+        shell::run_command_output(
+            &runtime_npm,
+            &["view", "openclaw", "version", "--loglevel=error"],
+        )
     } else {
         shell::run_bash_output("npm view openclaw version 2>/dev/null")
     };
@@ -2192,14 +2220,42 @@ pub async fn update_openclaw() -> Result<InstallResult, String> {
 
 /// Windows 更新 OpenClaw
 async fn update_openclaw_windows() -> Result<InstallResult, String> {
-    info!("[更新OpenClaw] 执行 npm install -g openclaw@latest...");
+    let Some(runtime_npm) = get_windows_runtime_npm_path() else {
+        return Ok(InstallResult {
+            success: false,
+            message: "OpenClaw 更新失败".to_string(),
+            error: Some("未找到 runtime npm，请先在应用内完成 Node 运行时安装".to_string()),
+        });
+    };
+    let runtime_prefix = get_windows_runtime_root_path().join("npm-global");
+    let prefix_str = runtime_prefix.display().to_string();
 
-    match shell::run_cmd_output("npm install -g openclaw@latest") {
+    info!(
+        "[更新OpenClaw] 使用 runtime npm 更新: {}, prefix={}",
+        runtime_npm, prefix_str
+    );
+
+    match shell::run_command_output(
+        &runtime_npm,
+        &[
+            "install",
+            "-g",
+            "openclaw@latest",
+            "--prefix",
+            &prefix_str,
+            "--unsafe-perm",
+            "--no-audit",
+            "--fund=false",
+            "--loglevel=error",
+        ],
+    ) {
         Ok(output) => {
             info!("[更新OpenClaw] npm 输出: {}", output);
 
             // 获取新版本
-            let new_version = get_openclaw_version();
+            let new_version = get_windows_runtime_openclaw_version(
+                get_windows_runtime_openclaw_path().as_deref(),
+            );
 
             Ok(InstallResult {
                 success: true,
