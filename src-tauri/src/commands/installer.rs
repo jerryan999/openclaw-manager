@@ -515,10 +515,22 @@ fn get_windows_runtime_root_path() -> PathBuf {
 }
 
 fn get_windows_runtime_openclaw_candidates() -> Vec<PathBuf> {
-    let runtime_prefix = get_windows_runtime_root_path().join("npm-global");
+    let rt = get_windows_runtime_root_path();
+    let npm_global = rt.join("npm-global");
+    let node_dir = rt.join("node");
     vec![
-        runtime_prefix.join("openclaw.cmd"),
-        runtime_prefix.join("node_modules").join(".bin").join("openclaw.cmd"),
+        npm_global.join("openclaw.cmd"),
+        npm_global
+            .join("node_modules")
+            .join(".bin")
+            .join("openclaw.cmd"),
+        npm_global.join("openclaw.ps1"),
+        npm_global.join("openclaw"),
+        node_dir.join("openclaw.cmd"),
+        node_dir
+            .join("node_modules")
+            .join(".bin")
+            .join("openclaw.cmd"),
     ]
 }
 
@@ -810,13 +822,22 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
         if !npm_cmd.exists() {
             runtime_attempt_error = Some("离线 Node.js 运行时不完整：缺少 npm.cmd".to_string());
         } else {
-            let install_cmd = format!(
-                "\"{}\" install -g \"{}\" --prefix \"{}\" --no-audit --fund=false --loglevel=error",
-                npm_cmd.display(),
-                runtime.openclaw_package.display(),
-                runtime.npm_prefix.display()
-            );
-            match shell::run_cmd_output(&install_cmd) {
+            let npm_str = npm_cmd.display().to_string();
+            let pkg_str = runtime.openclaw_package.display().to_string();
+            let prefix_str = runtime.npm_prefix.display().to_string();
+            match shell::run_command_output(
+                &npm_str,
+                &[
+                    "install",
+                    "-g",
+                    &pkg_str,
+                    "--prefix",
+                    &prefix_str,
+                    "--no-audit",
+                    "--fund=false",
+                    "--loglevel=error",
+                ],
+            ) {
                 Ok(_) => {
                     if runtime.openclaw_cmd.exists() || runtime_openclaw_cmd_bin.exists() {
                         return Ok(InstallResult {
@@ -1211,9 +1232,16 @@ Write-Host ("node(runtime): " + [IO.Path]::Combine($rt,'node','node.exe'))
 Write-Host ("npm(runtime): " + [IO.Path]::Combine($rt,'node','npm.cmd'))
 Write-Host ("openclaw(runtime): " + [IO.Path]::Combine($rt,'npm-global','openclaw.cmd'))
 Write-Host ("git(runtime): " + [IO.Path]::Combine($rt,'git','cmd','git.exe'))
+$ocCandidates = @(
+  [IO.Path]::Combine($rt,'npm-global','openclaw.cmd'),
+  [IO.Path]::Combine($rt,'npm-global','node_modules','.bin','openclaw.cmd'),
+  [IO.Path]::Combine($rt,'npm-global','openclaw.ps1'),
+  [IO.Path]::Combine($rt,'node','openclaw.cmd')
+)
+$ocExists = ($ocCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1)
 Write-Host ("node(runtime exists): " + (Test-Path ([IO.Path]::Combine($rt,'node','node.exe'))))
 Write-Host ("npm(runtime exists): " + (Test-Path ([IO.Path]::Combine($rt,'node','npm.cmd'))))
-Write-Host ("openclaw(runtime exists): " + (Test-Path ([IO.Path]::Combine($rt,'npm-global','openclaw.cmd'))))
+Write-Host ("openclaw(runtime exists): " + ($null -ne $ocExists) + $(if ($ocExists) { " ($ocExists)" } else { "" }))
 Write-Host ("git(runtime exists): " + (Test-Path ([IO.Path]::Combine($rt,'git','cmd','git.exe'))))
 Write-Host ""
 function Resolve-CommandPath($name) {
@@ -1231,6 +1259,10 @@ function Resolve-CommandPath($name) {
     "openclaw" {
       $runtimeCandidates += [IO.Path]::Combine($rt, "npm-global", "openclaw.cmd")
       $runtimeCandidates += [IO.Path]::Combine($rt, "npm-global", "node_modules", ".bin", "openclaw.cmd")
+      $runtimeCandidates += [IO.Path]::Combine($rt, "npm-global", "openclaw.ps1")
+      $runtimeCandidates += [IO.Path]::Combine($rt, "npm-global", "openclaw")
+      $runtimeCandidates += [IO.Path]::Combine($rt, "node", "openclaw.cmd")
+      $runtimeCandidates += [IO.Path]::Combine($rt, "node", "node_modules", ".bin", "openclaw.cmd")
     }
   }
 

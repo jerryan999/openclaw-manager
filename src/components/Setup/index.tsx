@@ -59,12 +59,32 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
       const status = await invoke<EnvironmentStatus>('check_environment');
       setupLogger.state('环境状态', status);
       setEnvStatus(status);
-      
-      if (status.ready) {
+
+      if (status.ready && status.openclaw_installed) {
         setupLogger.info('✅ 环境就绪');
         setStep('complete');
-        // 延迟一下再跳转，让用户看到成功状态
         setTimeout(() => onComplete(), 1500);
+      } else if (status.ready && !status.openclaw_installed) {
+        setupLogger.info('环境就绪且 OpenClaw 未安装，自动安装...');
+        setInstalling('openclaw');
+        try {
+          const result = await invoke<InstallResult>('install_openclaw');
+          if (result.success) {
+            await invoke<InstallResult>('init_openclaw_config');
+            const newStatus = await invoke<EnvironmentStatus>('check_environment');
+            setEnvStatus(newStatus);
+            setStep('complete');
+            setTimeout(() => onComplete(), 1500);
+          } else {
+            setError(`OpenClaw 自动安装失败: ${result.error || result.message}`);
+            setStep('install');
+          }
+        } catch (e) {
+          setError(`OpenClaw 自动安装失败: ${e}`);
+          setStep('install');
+        } finally {
+          setInstalling(null);
+        }
       } else {
         setupLogger.warn('环境未就绪，需要安装依赖');
         setStep('install');

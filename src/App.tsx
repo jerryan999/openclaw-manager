@@ -49,6 +49,12 @@ interface UpdateResult {
   error?: string;
 }
 
+interface InstallResult {
+  success: boolean;
+  message: string;
+  error?: string;
+}
+
 function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
   const [isReady, setIsReady] = useState<boolean | null>(null);
@@ -75,6 +81,24 @@ function App() {
       appLogger.info('环境检查完成', status);
       setEnvStatus(status);
       setIsReady(true); // 总是显示主界面
+
+      // 环境就绪但 OpenClaw 未安装时自动安装（无需用户操作）
+      if (status.ready && !status.openclaw_installed) {
+        appLogger.info('环境就绪且 OpenClaw 未安装，自动安装 OpenClaw...');
+        try {
+          const result = await invoke<InstallResult>('install_openclaw');
+          if (result.success) {
+            appLogger.info('OpenClaw 自动安装成功，初始化配置...');
+            await invoke<InstallResult>('init_openclaw_config');
+            const newStatus = await invoke<EnvironmentStatus>('check_environment');
+            setEnvStatus(newStatus);
+          } else {
+            appLogger.warn('OpenClaw 自动安装失败', result.message, result.error);
+          }
+        } catch (e) {
+          appLogger.error('OpenClaw 自动安装失败', e);
+        }
+      }
     } catch (e) {
       appLogger.error('环境检查失败', e);
       setIsReady(true);
