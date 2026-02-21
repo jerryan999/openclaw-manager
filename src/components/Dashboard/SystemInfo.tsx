@@ -2,12 +2,17 @@ import { useEffect, useState } from 'react';
 import { Monitor, Package, Folder, CheckCircle, XCircle } from 'lucide-react';
 import { api, SystemInfo as SystemInfoType, isTauri } from '../../lib/tauri';
 
-export function SystemInfo() {
+interface SystemInfoProps {
+  refreshToken?: string;
+}
+
+export function SystemInfo({ refreshToken }: SystemInfoProps) {
   const [info, setInfo] = useState<SystemInfoType | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchInfo = async () => {
+      setLoading(true);
       if (!isTauri()) {
         setLoading(false);
         return;
@@ -22,7 +27,7 @@ export function SystemInfo() {
       }
     };
     fetchInfo();
-  }, []);
+  }, [refreshToken]);
 
   const getOSLabel = (os: string) => {
     switch (os) {

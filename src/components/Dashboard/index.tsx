@@ -252,7 +252,9 @@ export function Dashboard({ envStatus, onSetupComplete }: DashboardProps) {
 
         {/* 系统信息 */}
         <motion.div variants={itemVariants}>
-          <SystemInfo />
+          <SystemInfo
+            refreshToken={`${envStatus?.openclaw_installed ?? false}|${envStatus?.openclaw_version ?? ''}|${envStatus?.node_version ?? ''}|${envStatus?.ready ?? false}`}
+          />
         </motion.div>
       </motion.div>
     </div>
