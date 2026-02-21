@@ -1,6 +1,6 @@
 {
   "name": "openclaw-manager",
-  "version": "0.0.18",
+  "version": "0.0.27",
   "description": "🦞 OpenClaw 跨平台管理工具 - 高性能 AI 助手配置与服务管理",
   "author": "jerryan999",
   "license": "MIT",
@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "bump": "node scripts/bump-version.cjs",
+    "version": "node scripts/bump-version.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

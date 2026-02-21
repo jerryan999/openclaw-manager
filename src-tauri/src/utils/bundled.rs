@@ -1,42 +1,52 @@
-use log::{info, warn, error};
+use log::{debug, error, info, warn};
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 
 /// 获取打包资源的路径
-/// 
-/// 在开发模式下，资源位于 `src-tauri/resources/`
-/// 在生产模式下，资源被打包到应用程序包中
+///
+/// 在开发模式下，会回退到 exe 所在 crate 的 resources（src-tauri/resources）
+/// 在生产模式下，资源在应用包内
 pub fn get_resource_path(app_handle: &tauri::AppHandle, resource_name: &str) -> Option<PathBuf> {
-    // 尝试从打包资源中获取
     if let Ok(resource_path) = app_handle.path().resource_dir() {
-        info!("[资源] 资源根目录: {:?}", resource_path);
+        debug!("[资源] 资源根目录: {:?}", resource_path);
         let full_path = resource_path.join(resource_name);
-        info!("[资源] 检查路径: {:?}, exists={}", full_path, full_path.exists());
         if full_path.exists() {
             info!("[资源] ✓ 找到打包资源: {:?}", full_path);
             return Some(full_path);
         }
-        
-        // 列出资源目录的内容，帮助调试
+        debug!("[资源] 检查路径: {:?}, exists=false", full_path);
         if let Ok(entries) = std::fs::read_dir(&resource_path) {
-            info!("[资源] 资源目录内容:");
+            debug!("[资源] 资源目录内容:");
             for entry in entries.flatten() {
-                info!("[资源]   - {:?}", entry.file_name());
+                debug!("[资源]   - {:?}", entry.file_name());
             }
         }
-    } else {
-        warn!("[资源] 无法获取资源目录");
     }
-    
-    // 开发模式：从 src-tauri/resources/ 读取
-    if cfg!(debug_assertions) {
-        let dev_path = PathBuf::from("src-tauri/resources").join(resource_name);
-        if dev_path.exists() {
-            info!("[资源] 找到开发资源: {:?}", dev_path);
-            return Some(dev_path);
+
+    // 开发模式回退：exe 在 src-tauri/target/debug 时，取 src-tauri/resources
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            let dev_resources = exe_dir.join("..").join("..").join("resources");
+            let full = dev_resources.join(resource_name);
+            if full.exists() {
+                info!("[资源] 找到开发资源: {:?}", full);
+                return Some(full);
+            }
         }
     }
-    
+    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+        let full = PathBuf::from(manifest).join("resources").join(resource_name);
+        if full.exists() {
+            info!("[资源] 找到开发资源: {:?}", full);
+            return Some(full);
+        }
+    }
+    let dev_rel = PathBuf::from("src-tauri/resources").join(resource_name);
+    if dev_rel.exists() {
+        info!("[资源] 找到开发资源: {:?}", dev_rel);
+        return Some(dev_rel);
+    }
+
     warn!("[资源] ✗ 未找到资源: {}", resource_name);
     None
 }
@@ -60,23 +70,9 @@ pub fn has_bundled_nodejs(app_handle: &tauri::AppHandle) -> bool {
     get_resource_path(app_handle, resource_name).is_some()
 }
 
-/// 检查是否有打包的 OpenClaw
+/// 检查是否有打包的 OpenClaw（仅认 openclaw.tgz）
 pub fn has_bundled_openclaw(app_handle: &tauri::AppHandle) -> bool {
-    // 检查是否有打包的 npm 包
-    if let Some(path) = get_resource_path(app_handle, "openclaw") {
-        // 检查目录中是否有 .tgz 文件
-        if let Ok(entries) = std::fs::read_dir(&path) {
-            for entry in entries.flatten() {
-                let file_name = entry.file_name();
-                let file_str = file_name.to_string_lossy();
-                if file_str.ends_with(".tgz") || file_str.ends_with(".tar.gz") {
-                    info!("[资源] 找到打包的 OpenClaw: {:?}", entry.path());
-                    return true;
-                }
-            }
-        }
-    }
-    false
+    get_bundled_openclaw_package(app_handle).is_some()
 }
 
 /// 提取打包的 Node.js 到系统目录
@@ -126,22 +122,14 @@ pub async fn extract_bundled_nodejs(
     Ok(node_bin)
 }
 
-/// 获取打包的 OpenClaw npm 包路径
+/// 获取打包的 OpenClaw npm 包路径（仅认 openclaw.tgz，与 download 脚本一致）
 pub fn get_bundled_openclaw_package(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
     let openclaw_dir = get_resource_path(app_handle, "openclaw")?;
-    
-    // 查找 .tgz 文件
-    if let Ok(entries) = std::fs::read_dir(&openclaw_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let file_name = path.file_name()?.to_string_lossy();
-            if file_name.ends_with(".tgz") || file_name.ends_with(".tar.gz") {
-                info!("[资源] 找到 OpenClaw 包: {:?}", path);
-                return Some(path);
-            }
-        }
+    let path = openclaw_dir.join("openclaw.tgz");
+    if path.is_file() {
+        info!("[资源] 找到 OpenClaw 包: {:?}", path);
+        return Some(path);
     }
-    
     None
 }
 

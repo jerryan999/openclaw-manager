@@ -1,0 +1,24 @@
+# Git 离线资源（仅 Windows）
+
+本目录用于存放 Windows 64 位 Git 的 **.zip** 包，供应用在无系统 Git 时使用。
+
+## 如何添加
+
+在项目根目录的 `src-tauri/resources` 下执行：
+
+```powershell
+.\download-resources.ps1
+```
+
+会优先将当前系统 Git 打包为 `git-portable.zip`。
+
+或从 [Git for Windows Releases](https://github.com/git-for-windows/git/releases) 下载 Git zip 包，放入本目录：
+
+- **推荐命名**：`git-portable.zip`（优先级最高）
+- 兼容命名：`PortableGit.zip`
+- 也可不重命名：本目录下任意 **.zip** 均会被识别为 Git 包
+
+## 说明
+
+- 应用仅支持 **.zip** 格式（不支持 .7z）；需为**压缩包文件**，不要放解压后的文件夹。
+- 不放入任何文件时，应用会使用系统 PATH 中的 Git（若存在）。

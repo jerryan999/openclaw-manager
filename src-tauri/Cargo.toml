@@ -1,6 +1,6 @@
 [package]
 name = "openclaw-manager"
-version = "0.0.18"
+version = "0.0.27"
 description = "OpenClaw 跨平台管理工具"
 authors = ["OpenClaw Team"]
 edition = "2021"
@@ -22,6 +22,7 @@ dirs = "5"
 thiserror = "1"
 log = "0.4"
 env_logger = "0.11"
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.26"

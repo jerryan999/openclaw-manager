@@ -10,7 +10,7 @@
 ```json
 "resources": [
   "./resources/nodejs/*",
-  "./resources/openclaw/*"   // ← 这会包含 openclaw-zh.tgz
+  "./resources/openclaw/*"   // ← 这会包含 openclaw.tgz
 ]
 ```
 
@@ -51,8 +51,8 @@
 - `src-tauri/resources/download-resources.ps1` (Windows)
 
 **功能**:
-- ✅ 下载 `@jerryan999/openclaw-zh` 包
-- ✅ 重命名为统一文件名 `openclaw-zh.tgz`
+- ✅ 下载 `openclaw@latest` 包
+- ✅ 重命名为统一文件名 openclaw.tgz
 - ✅ 保存到 `src-tauri/resources/openclaw/` 目录
 
 ---
@@ -63,9 +63,9 @@
 ```rust
 fn get_bundled_openclaw_package() -> Option<String> {
     let resource_paths = vec![
-        "resources/openclaw/openclaw-zh.tgz",
-        "../resources/openclaw/openclaw-zh.tgz",
-        "openclaw-zh.tgz",
+        "resources/openclaw/openclaw.tgz",
+        "../resources/openclaw/openclaw.tgz",
+        "openclaw.tgz",
     ];
     
     for path in resource_paths {
@@ -96,12 +96,12 @@ cd src-tauri/resources
 
 #### 2. 检查文件
 ```bash
-ls -lh src-tauri/resources/openclaw/openclaw-zh.tgz
+ls -lh src-tauri/resources/openclaw/openclaw.tgz
 ```
 
 **预期输出**: 
 ```
--rw-r--r--  1 user  staff   15M  openclaw-zh.tgz
+-rw-r--r--  1 user  staff   15M  openclaw.tgz
 ```
 
 #### 3. 构建测试
@@ -129,7 +129,7 @@ dir src-tauri\target\release\bundle\msi\*.msi
 ```
 📦 下载 OpenClaw（离线安装，无需 Git）...
   使用 npm pack 打包...
-  ✓ 已保存为: openclaw-zh.tgz
+  ✓ 已保存为: openclaw.tgz
 ```
 
 #### 2. 下载构建产物
@@ -211,15 +211,15 @@ make release
 ### Q: 如何确认离线包已打包？
 
 **A**: 检查三个地方：
-1. CI 日志显示 "✓ 已保存为: openclaw-zh.tgz"
+1. CI 日志显示 "✓ 已保存为: openclaw.tgz"
 2. 安装包体积比之前版本大 ~15MB
 3. Windows 用户安装时不再要求 Git
 
 ### Q: 离线包在应用中的位置？
 
 **A**: 
-- macOS: `OpenClaw Manager.app/Contents/Resources/openclaw-zh.tgz`
-- Windows: `C:\Program Files\OpenClaw Manager\resources\openclaw-zh.tgz`
+- macOS: `OpenClaw Manager.app/Contents/Resources/openclaw.tgz`
+- Windows: `C:\Program Files\OpenClaw Manager\resources\openclaw.tgz`
 
 ### Q: 如果离线包下载失败怎么办？
 
@@ -227,7 +227,7 @@ make release
 
 ### Q: 可以手动添加离线包吗？
 
-**A**: 可以，在 `src-tauri/resources/openclaw/` 目录下放置 `openclaw-zh.tgz` 文件后重新构建。
+**A**: 可以，在 `src-tauri/resources/openclaw/` 目录下放置 `openclaw.tgz` 文件后重新构建。
 
 ---
 
@@ -235,7 +235,7 @@ make release
 
 在发布前确认：
 
-- [ ] `src-tauri/resources/openclaw/openclaw-zh.tgz` 存在（本地测试）
+- [ ] `src-tauri/resources/openclaw/openclaw.tgz` 存在（本地测试）
 - [ ] CI 日志显示成功下载离线包
 - [ ] 构建产物体积符合预期（~25MB macOS, ~23MB Windows）
 - [ ] 测试安装不要求 Git（Windows）

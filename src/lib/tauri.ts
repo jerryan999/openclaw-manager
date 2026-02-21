@@ -156,8 +156,13 @@ export const api = {
 
   // 系统信息
   getSystemInfo: () => invokeWithLog<SystemInfo>('get_system_info'),
+  getAppVersion: () => invokeWithLog<string>('get_app_version'),
   checkOpenclawInstalled: () => invokeWithLog<boolean>('check_openclaw_installed'),
   getOpenclawVersion: () => invokeWithLog<string | null>('get_openclaw_version'),
+  /** 安装/更新渠道：latest | nightly */
+  getOpenclawChannel: () => invokeWithLog<string>('get_openclaw_channel'),
+  setOpenclawChannel: (channel: string) =>
+    invokeWithLog<string>('set_openclaw_channel', { channel }),
 
   // 配置管理
   getConfig: () => invokeWithLog<unknown>('get_config'),

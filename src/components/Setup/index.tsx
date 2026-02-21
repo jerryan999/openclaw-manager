@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
+import { api } from '../../lib/tauri';
 import { 
   CheckCircle2,
   Loader2, 
   Download,
-  ArrowRight,
   RefreshCw,
   ExternalLink,
   Cpu,
   Package,
-  GitBranch
+  GitBranch,
 } from 'lucide-react';
 import { setupLogger } from '../../lib/logger';
 
@@ -44,9 +44,11 @@ interface SetupProps {
 export function Setup({ onComplete, embedded = false }: SetupProps) {
   const [envStatus, setEnvStatus] = useState<EnvironmentStatus | null>(null);
   const [checking, setChecking] = useState(true);
-  const [installing, setInstalling] = useState<'nodejs' | 'openclaw' | null>(null);
+  const [installing, setInstalling] = useState<'nodejs' | 'git' | 'openclaw' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'check' | 'install' | 'complete'>('check');
+  /** OpenClaw 安装/更新渠道：latest | nightly */
+  const [openclawChannel, setOpenclawChannel] = useState<string>('latest');
 
   const checkEnvironment = async () => {
     setupLogger.info('检查系统环境...');
@@ -56,14 +58,13 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
       const status = await invoke<EnvironmentStatus>('check_environment');
       setupLogger.state('环境状态', status);
       setEnvStatus(status);
-      
-      if (status.ready) {
+
+      if (status.ready && status.openclaw_installed) {
         setupLogger.info('✅ 环境就绪');
         setStep('complete');
-        // 延迟一下再跳转，让用户看到成功状态
         setTimeout(() => onComplete(), 1500);
       } else {
-        setupLogger.warn('环境未就绪，需要安装依赖');
+        setupLogger.warn('环境未就绪或 OpenClaw 未安装，需要用户手动触发安装');
         setStep('install');
       }
     } catch (e) {
@@ -77,6 +78,12 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
   useEffect(() => {
     setupLogger.info('Setup 组件初始化');
     checkEnvironment();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      api.getOpenclawChannel().then(setOpenclawChannel).catch(() => {});
+    }
   }, []);
 
   const handleInstallNodejs = async () => {
@@ -96,6 +103,9 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
       } else if (result.message.includes('重启')) {
         // 需要重启应用
         setError('Node.js 安装完成，请重启应用以使环境变量生效');
+      } else if (envStatus?.os === 'windows') {
+        // Windows 离线包不应回退到在线安装终端
+        setError(`Node.js 离线安装失败: ${result.error || result.message}`);
       } else {
         // 打开终端手动安装
         await invoke<string>('open_install_terminal', { installType: 'nodejs' });
@@ -103,11 +113,15 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
       }
     } catch (e) {
       // 如果自动安装失败，打开终端
-      try {
-        await invoke<string>('open_install_terminal', { installType: 'nodejs' });
-        setError('已打开安装终端，请在终端中完成安装后点击"重新检查"');
-      } catch (termErr) {
-        setError(`安装失败: ${e}。${termErr}`);
+      if (envStatus?.os === 'windows') {
+        setError(`Node.js 离线安装失败: ${e}`);
+      } else {
+        try {
+          await invoke<string>('open_install_terminal', { installType: 'nodejs' });
+          setError('已打开安装终端，请在终端中完成安装后点击"重新检查"');
+        } catch (termErr) {
+          setError(`安装失败: ${e}。${termErr}`);
+        }
       }
     } finally {
       setInstalling(null);
@@ -130,6 +144,8 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
         setupLogger.info('✅ 配置初始化完成');
         // 重新检查环境
         await checkEnvironment();
+      } else if (envStatus?.os === 'windows') {
+        setError(`OpenClaw 离线安装失败: ${result.error || result.message}`);
       } else {
         setupLogger.warn('自动安装失败，打开终端手动安装');
         // 打开终端手动安装
@@ -138,12 +154,32 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
       }
     } catch (e) {
       setupLogger.error('安装失败，尝试打开终端', e);
-      try {
-        await invoke<string>('open_install_terminal', { installType: 'openclaw' });
-        setError('已打开安装终端，请在终端中完成安装后点击"重新检查"');
-      } catch (termErr) {
-        setError(`安装失败: ${e}。${termErr}`);
+      if (envStatus?.os === 'windows') {
+        setError(`OpenClaw 离线安装失败: ${e}`);
+      } else {
+        try {
+          await invoke<string>('open_install_terminal', { installType: 'openclaw' });
+          setError('已打开安装终端，请在终端中完成安装后点击"重新检查"');
+        } catch (termErr) {
+          setError(`安装失败: ${e}。${termErr}`);
+        }
       }
+    } finally {
+      setInstalling(null);
+    }
+  };
+
+  const handleInstallGit = async () => {
+    setupLogger.action('安装 Git');
+    setupLogger.info('开始安装 Git...');
+    setInstalling('git');
+    setError(null);
+
+    try {
+      await invoke<string>('open_install_terminal', { installType: 'git' });
+      setError('已打开 Git 安装终端，请在终端中完成安装后点击"重新检查"');
+    } catch (e) {
+      setError(`打开 Git 安装终端失败: ${e}`);
     } finally {
       setInstalling(null);
     }
@@ -275,21 +311,75 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                 
                 {envStatus.git_installed ? (
                   <CheckCircle2 className="w-6 h-6 text-green-400" />
-                ) : envStatus.has_offline_package ? (
-                  <span className="text-xs text-blue-400 px-3 py-1 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                    可选
-                  </span>
                 ) : (
-                  <a
-                    href="https://git-scm.com/download/win"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={handleInstallGit}
+                    disabled={installing !== null}
                     className="btn-primary text-sm px-4 py-2 flex items-center gap-2"
+                    title={
+                      envStatus.has_offline_package
+                        ? '已有离线包，Git 可选安装'
+                        : '在线安装需要 Git；建议优先放置 git-portable.zip'
+                    }
                   >
-                    <ExternalLink className="w-4 h-4" />
-                    下载
-                  </a>
+                    {installing === 'git' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        安装中...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        {envStatus.has_offline_package ? '安装 (可选)' : '安装'}
+                      </>
+                    )}
+                  </button>
                 )}
+              </div>
+            )}
+
+            {/* OpenClaw 渠道（仅 Tauri 环境） */}
+            {typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-dark-400">安装/更新渠道</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await api.setOpenclawChannel('latest');
+                        setOpenclawChannel('latest');
+                      } catch (e) {
+                        setupLogger.error('切换渠道失败', e);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      openclawChannel === 'latest'
+                        ? 'bg-brand-500/30 text-brand-300 border border-brand-500/50'
+                        : 'bg-dark-700 text-dark-300 hover:bg-dark-600 border border-dark-600'
+                    }`}
+                  >
+                    Latest
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await api.setOpenclawChannel('nightly');
+                        setOpenclawChannel('nightly');
+                      } catch (e) {
+                        setupLogger.error('切换渠道失败', e);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      openclawChannel === 'nightly'
+                        ? 'bg-brand-500/30 text-brand-300 border border-brand-500/50'
+                        : 'bg-dark-700 text-dark-300 hover:bg-dark-600 border border-dark-600'
+                    }`}
+                  >
+                    Nightly
+                  </button>
+                </div>
               </div>
             )}
 
@@ -306,7 +396,9 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                 <div>
                   <p className="text-white font-medium">OpenClaw</p>
                   <p className="text-sm text-dark-400">
-                    {envStatus.openclaw_version || '未安装'}
+                    {envStatus.openclaw_installed
+                      ? (envStatus.openclaw_version || '已安装')
+                      : '未安装'}
                   </p>
                 </div>
               </div>
@@ -379,16 +471,6 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                 <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
                 重新检查
               </button>
-              
-              {envStatus.ready && (
-                <button
-                  onClick={onComplete}
-                  className="flex-1 btn-primary py-2.5 flex items-center justify-center gap-2"
-                >
-                  开始使用
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              )}
             </div>
 
             {/* 帮助链接 */}

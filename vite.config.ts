@@ -11,6 +11,7 @@ export default defineConfig({
   
   // Tauri 期望使用固定端口，如果端口不可用则失败
   server: {
+    host: '127.0.0.1',
     port: 1420,
     strictPort: true,
     watch: {

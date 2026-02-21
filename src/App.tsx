@@ -15,6 +15,8 @@ import { Download, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
 export type PageType = 'dashboard' | 'ai' | 'channels' | 'testing' | 'logs' | 'settings';
 
+let hasBootEnvironmentChecked = false;
+
 export interface EnvironmentStatus {
   node_installed: boolean;
   node_version: string | null;
@@ -36,6 +38,8 @@ interface UpdateInfo {
   update_available: boolean;
   current_version: string | null;
   latest_version: string | null;
+  /** 当前渠道：latest / nightly */
+  channel: string | null;
   error: string | null;
 }
 
@@ -70,7 +74,7 @@ function App() {
       const status = await invoke<EnvironmentStatus>('check_environment');
       appLogger.info('环境检查完成', status);
       setEnvStatus(status);
-      setIsReady(true); // 总是显示主界面
+      setIsReady(true); // 总是显示主界面，由用户在环境向导中手动触发安装
     } catch (e) {
       appLogger.error('环境检查失败', e);
       setIsReady(true);
@@ -122,6 +126,11 @@ function App() {
   };
 
   useEffect(() => {
+    if (hasBootEnvironmentChecked) {
+      appLogger.info('跳过重复的环境检查触发');
+      return;
+    }
+    hasBootEnvironmentChecked = true;
     appLogger.info('🦞 App 组件已挂载');
     checkEnvironment();
   }, [checkEnvironment]);
@@ -157,6 +166,16 @@ function App() {
     appLogger.info('安装向导完成');
     checkEnvironment(); // 重新检查环境
   }, [checkEnvironment]);
+
+  const handleOpenDebugTerminal = useCallback(async () => {
+    if (!isTauri()) return;
+    try {
+      await invoke<string>('open_debug_terminal');
+    } catch (e) {
+      appLogger.error('打开诊断终端失败', e);
+      console.error('打开诊断终端失败:', e);
+    }
+  }, []);
 
   // 页面切换处理
   const handleNavigate = (page: PageType) => {
@@ -248,6 +267,7 @@ function App() {
                       </p>
                       <p className="text-xs text-white/70">
                         当前版本: {updateInfo.current_version}
+                        {updateInfo.channel && ` · 渠道: ${updateInfo.channel}`}
                       </p>
                     </>
                   )}
@@ -295,7 +315,10 @@ function App() {
       {/* 主内容区 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 标题栏（macOS 拖拽区域） */}
-        <Header currentPage={currentPage} />
+        <Header
+          currentPage={currentPage}
+          onOpenTerminal={handleOpenDebugTerminal}
+        />
         
         {/* 页面内容 */}
         <main className="flex-1 overflow-hidden p-6">

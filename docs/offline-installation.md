@@ -36,8 +36,8 @@ cd src-tauri/resources
 
 # 或者手动下载 OpenClaw 包
 cd openclaw
-npm pack @jerryan999/openclaw-zh
-mv jerryan999-openclaw-zh-*.tgz openclaw-zh.tgz
+npm pack openclaw@latest
+mv openclaw-*.tgz openclaw.tgz
 ```
 
 ### 方案 3：跳过离线包（保持在线安装）
@@ -51,13 +51,13 @@ mv jerryan999-openclaw-zh-*.tgz openclaw-zh.tgz
 ```
 启动安装
     ↓
-检查 openclaw-zh.tgz 是否存在？
-    ├─ 是 → 离线安装（npm install -g ./openclaw-zh.tgz）
+检查 openclaw.tgz 是否存在？
+    ├─ 是 → 离线安装（npm install -g ./openclaw.tgz）
     │         ✓ 不需要 Git
     │         ✓ 不需要网络
     │         ✓ 更快更可靠
     │
-    └─ 否 → 在线安装（npm install -g @jerryan999/openclaw-zh）
+    └─ 否 → 在线安装（npm install -g openclaw@latest）
               ⚠️ Windows 需要 Git
               ⚠️ 需要网络连接
 ```
@@ -69,9 +69,9 @@ mv jerryan999-openclaw-zh-*.tgz openclaw-zh.tgz
 ```rust
 fn get_bundled_openclaw_package() -> Option<String> {
     let resource_paths = vec![
-        "resources/openclaw/openclaw-zh.tgz",
-        "../resources/openclaw/openclaw-zh.tgz",
-        "openclaw-zh.tgz",
+        "resources/openclaw/openclaw.tgz",
+        "../resources/openclaw/openclaw.tgz",
+        "openclaw.tgz",
     ];
     
     for path in resource_paths {
@@ -151,10 +151,10 @@ npm run tauri:build
 
 ```bash
 # 检查文件是否存在
-ls -la src-tauri/resources/openclaw/openclaw-zh.tgz
+ls -la src-tauri/resources/openclaw/openclaw.tgz
 
 # 确认文件不是空的
-du -h src-tauri/resources/openclaw/openclaw-zh.tgz
+du -h src-tauri/resources/openclaw/openclaw.tgz
 
 # 应该显示 ~10-20MB
 ```
@@ -167,7 +167,7 @@ npm --version
 
 # 手动打包
 cd src-tauri/resources/openclaw
-npm pack @jerryan999/openclaw-zh --verbose
+npm pack openclaw@latest --verbose
 ```
 
 ### Windows 仍然要求 Git
@@ -196,6 +196,21 @@ curl -L -o node-windows-x64.zip \
 ```
 
 ⚠️ 注意：打包 Node.js 会增加 ~50MB 体积，仅在必要时使用。
+
+## 🔧 故障排除
+
+### 报错：Cannot find package 'xxx'（如 ajv）
+
+**原因**：Windows 上 `npm install -g <tgz> --prefix` 有时不会把包的依赖正确装到 prefix 的 `node_modules`，导致运行时缺包。
+
+**当前 CI 做法**：在全局安装 openclaw.tgz 后，再在已安装的包目录内执行 `npm install --omit=dev`，把 openclaw 的**全部生产依赖**装进 `node_modules/openclaw/node_modules/`，避免漏装任意依赖。
+
+若你用的是旧版安装包仍报缺包，可重新安装新构建的版本；或有网络时在 PowerShell 手动补装（示例为 ajv）：
+
+```powershell
+$rt = "$env:LOCALAPPDATA\OpenClawManager\runtime"
+& "$rt\node\npm.cmd" install ajv --prefix "$rt\npm-global" --no-audit --loglevel=error
+```
 
 ## 📚 相关文档
 

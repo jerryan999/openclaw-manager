@@ -2,7 +2,7 @@
 
 高性能跨平台 AI 助手管理工具，基于 **Tauri 2.0 + React + TypeScript + Rust** 构建。
 
-> **✨ 本项目使用 [jerryan999/OpenClawChinese](https://github.com/jerryan999/OpenClawChinese) 无广告中文版。**
+> **✨ 本项目使用官方 [OpenClaw](https://www.npmjs.com/package/openclaw)（openclaw@latest）。**
 
 > **🎁 v0.0.12+ 为完全离线版：内置 Node.js + OpenClaw，开箱即用，无需任何配置！** [查看详情](OFFLINE.md)
 
@@ -173,9 +173,28 @@ npm run tauri:dev
 npm run tauri:build
 ```
 
+### 版本号一键更新
+
+项目版本号分布在 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、`Makefile` 四处。使用脚本可一次改齐，无需手动改多处：
+
+```bash
+# 将版本号统一更新为 x.y.z（会修改上述 4 个文件）
+npm run version 0.0.26
+# 或
+npm run bump 0.0.26
+```
+
+版本号格式须为 `x.y.z`（如 `0.0.26`）。更新完成后，再提交并打 tag 推送即可：
+
+```bash
+git add -A && git commit -m "chore: bump version to 0.0.26"
+git tag -a v0.0.26 -m "Release v0.0.26"
+git push origin dev && git push origin v0.0.26
+```
+
 ### 使用 Makefile（推荐）
 
-项目提供了 Makefile 来简化常用操作，特别是版本发布流程：
+项目提供了 Makefile 来简化常用操作：
 
 ```bash
 # 查看所有可用命令
@@ -185,33 +204,12 @@ make help
 make install      # 安装依赖
 make dev          # 启动开发服务器
 make build        # 构建应用
-make check        # 检查 Rust 代码
-make fmt          # 格式化 Rust 代码
-
-# 版本发布流程
-# 1. 修改 Makefile 顶部的 TAG 变量（例如：TAG := 0.0.10）
-# 2. 执行完整发布流程
-make release      # 自动更新版本号 -> 提交 -> 创建 tag -> 推送
-
-# 或者在命令行直接指定版本
-make quick-release TAG=0.0.11
+make check        # 检查环境与资源
+make clean        # 清理构建产物
 
 # 其他实用命令
-make status       # 查看 git 状态
-make list-tags    # 列出所有 tags
-make rollback-tag # 删除当前 TAG（慎用）
-```
-
-**版本发布示例**：
-
-```bash
-# 修改 Makefile 中的 TAG 变量
-# TAG := 0.0.10
-
-# 执行发布（会自动更新所有版本号文件、提交、创建 tag、推送）
-make release
-
-# 🎉 完成！GitHub Actions 会自动构建并创建 Release
+make info         # 查看项目与资源状态
+make resources    # 下载打包所需资源（Node/OpenClaw 等）
 ```
 
 ## 📁 项目结构
@@ -272,6 +270,17 @@ openclaw-manager/
 | macOS | `.dmg`, `.app` |
 | Windows | `.msi`, `.exe` |
 | Linux | `.deb`, `.AppImage` |
+
+### Windows 离线安装包说明
+
+Windows 版支持离线运行时打包。打包时会把 `src-tauri/resources/**` 一并放入安装包，并在首次运行自动解压到本地运行时目录。
+
+- 内置 Node.js：`src-tauri/resources/nodejs/node-windows-x64.zip`
+- 内置 OpenClaw 包：`src-tauri/resources/openclaw/openclaw.tgz`
+- 预装 OpenClaw 运行时：`src-tauri/resources/offline/npm-global.zip`（由 GitHub Actions 在 Windows 构建时自动生成）
+- 可选内置 Git（便携版 zip）：放到 `src-tauri/resources/git/`，支持文件名：
+  - `git-portable.zip`
+  - `PortableGit.zip`
 
 ## 🎨 设计理念
 
@@ -344,7 +353,7 @@ MIT License - 详见 [LICENSE](LICENSE)
 
 - [OpenClaw Manager](https://github.com/miaoxworld/openclaw-manager) - 图形界面版本（本项目）
 - [OpenClawInstaller](https://github.com/miaoxworld/OpenClawInstaller) - 命令行版本
-- [OpenClaw 中文版](https://github.com/jerryan999/OpenClawChinese) - 本项目使用的 OpenClaw 中文版
+- [OpenClaw](https://www.npmjs.com/package/openclaw) - 本项目使用的官方 OpenClaw（npm openclaw@latest）
 - [OpenClaw 插件文档](https://docs.clawd.bot/plugins) - 官方插件文档
 - [Tauri 官方文档](https://tauri.app/)
 - [React 官方文档](https://react.dev/)

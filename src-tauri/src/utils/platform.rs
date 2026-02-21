@@ -41,6 +41,15 @@ pub fn get_config_file_path() -> String {
     }
 }
 
+/// 获取 OpenClaw Manager 自身配置路径（如渠道 latest/nightly）
+pub fn get_manager_config_path() -> String {
+    if is_windows() {
+        format!("{}\\manager.json", get_config_dir())
+    } else {
+        format!("{}/manager.json", get_config_dir())
+    }
+}
+
 /// 获取日志文件路径
 pub fn get_log_file_path() -> String {
     if is_windows() {

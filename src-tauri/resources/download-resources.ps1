@@ -1,10 +1,10 @@
 # PowerShell 脚本：下载打包资源
 # 用于 Windows 平台的 CI/CD 或本地开发
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = "Stop"
 
 $NODE_VERSION = "22.12.0"
-$OPENCLAW_PACKAGE = "@jerryan999/openclaw-zh"
+$OPENCLAW_PACKAGE = "openclaw"
 
 Write-Host "=========================================="
 Write-Host "  下载打包资源"
@@ -14,6 +14,7 @@ Write-Host ""
 # 创建目录
 New-Item -ItemType Directory -Force -Path "nodejs" | Out-Null
 New-Item -ItemType Directory -Force -Path "openclaw" | Out-Null
+New-Item -ItemType Directory -Force -Path "git" | Out-Null
 
 # 下载 Node.js for Windows
 Write-Host "📦 下载 Node.js v$NODE_VERSION..."
@@ -35,6 +36,34 @@ try {
 Set-Location ".."
 Write-Host ""
 
+# 准备 Git for Windows 离线包（仅使用 portable Git）
+Write-Host "📦 准备 Git (Windows 64-bit, portable 优先)..."
+Set-Location "git"
+$portableFile = "git-portable.zip"
+if (-not (Test-Path $portableFile)) {
+    $gitCmd = Get-Command git -ErrorAction SilentlyContinue
+    if ($gitCmd) {
+        try {
+            Write-Host "  发现系统 Git，正在打包为 $portableFile ..."
+            $gitExe = $gitCmd.Source
+            $gitRoot = Split-Path (Split-Path $gitExe -Parent) -Parent
+            Compress-Archive -Path "$gitRoot\*" -DestinationPath $portableFile -Force
+            Write-Host "  ✓ 已生成: $portableFile"
+        } catch {
+            Write-Host "  ✗ 打包系统 Git 失败: $_"
+        }
+    } else {
+        Write-Host "  ⚠️  当前系统未检测到 Git，无法自动生成 $portableFile"
+        Write-Host "  请手动放置 Git for Windows 的便携版 zip 到 src-tauri/resources/git/ 并命名为 $portableFile"
+    }
+}
+
+if (Test-Path $portableFile) {
+    Write-Host "  ✓ 已存在: $portableFile（跳过）"
+}
+Set-Location ".."
+Write-Host ""
+
 # 下载 OpenClaw（离线安装，无需 Git）
 Write-Host "📦 下载 OpenClaw（离线安装，无需 Git）..."
 Set-Location "openclaw"
@@ -42,16 +71,16 @@ Set-Location "openclaw"
 if (Get-Command npm -ErrorAction SilentlyContinue) {
     Write-Host "  使用 npm pack 打包..."
     Remove-Item "*.tgz" -ErrorAction SilentlyContinue
-    # 强制清除缓存并从 registry 获取最新版本
-    npm cache clean --force 2>$null
+    # 校验缓存并从 registry 获取最新版本（npm 5+ 推荐用 verify 替代 clean）
+    npm cache verify
     npm pack "$($OPENCLAW_PACKAGE)@latest" --prefer-online
     
-    # 重命名为统一的文件名
-    $tgzFiles = Get-ChildItem "jerryan999-openclaw-zh-*.tgz"
+    # npm pack openclaw 生成 openclaw-<version>.tgz，重命名为统一文件名
+    $tgzFiles = Get-ChildItem "openclaw-*.tgz"
     if ($tgzFiles.Count -gt 0) {
         $tgzFile = $tgzFiles[0]
-        Move-Item -Path $tgzFile.Name -Destination "openclaw-zh.tgz" -Force
-        Write-Host "  ✓ 已保存为: openclaw-zh.tgz"
+        Move-Item -Path $tgzFile.Name -Destination "openclaw.tgz" -Force
+        Write-Host "  ✓ 已保存为: openclaw.tgz"
     }
 } else {
     Write-Host "  ⚠️  npm 未安装，跳过 OpenClaw 下载"
@@ -68,24 +97,19 @@ Write-Host "=========================================="
 Write-Host ""
 Write-Host "Node.js:"
 Get-ChildItem "nodejs" -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host "  $($_.Name) - $([math]::Round($_.Length / 1MB, 2)) MB"
+    $mb = [math]::Round($_.Length / 1MB, 2); Write-Host ("  " + $_.Name + " - " + $mb + " MB")
 }
 Write-Host ""
 Write-Host "OpenClaw:"
 Get-ChildItem "openclaw" -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host "  $($_.Name) - $([math]::Round($_.Length / 1MB, 2)) MB"
+    $mb = [math]::Round($_.Length / 1MB, 2); Write-Host ("  " + $_.Name + " - " + $mb + " MB")
+}
+Write-Host ""
+Write-Host "Git (Windows):"
+Get-ChildItem "git" -ErrorAction SilentlyContinue | ForEach-Object {
+    $mb = [math]::Round($_.Length / 1MB, 2); Write-Host ("  " + $_.Name + " - " + $mb + " MB")
 }
 Write-Host ""
 
-Write-Host "✅ 完成！"
+Write-Host "Done."
 Write-Host ""
-Write-Host "💡 提示："
-Write-Host "  - OpenClaw 离线包安装时不需要 Git，更可靠"
-Write-Host "  - 开发模式不需要下载所有平台的资源"
-Write-Host "  - 生产构建时确保目标平台的资源已下载"
-Write-Host "  - 可以在 CI/CD 中运行此脚本自动下载"
-Write-Host ""
-Write-Host "📦 打包体积影响："
-Write-Host "  - Node.js (Windows): ~40-50MB"
-Write-Host "  - OpenClaw .tgz: ~10-20MB"
-Write-Host "  - 总计: ~50-70MB"

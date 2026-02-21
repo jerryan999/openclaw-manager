@@ -48,11 +48,12 @@ curl -L -o node-linux-x64.tar.gz \
 cd src-tauri/resources/openclaw
 
 # 方法一：直接打包（推荐）
-npm pack @jerryan999/openclaw-zh
+npm pack openclaw@latest
+mv openclaw-*.tgz openclaw.tgz
 
 # 方法二：下载包及所有依赖
-npm install --global-style --no-save @jerryan999/openclaw-zh
-tar -czf jerryan999-openclaw-zh.tgz node_modules/@jerryan999/openclaw-zh
+npm install --global-style --no-save openclaw@latest
+tar -czf openclaw.tgz node_modules/openclaw
 ```
 
 ### 3. 修改安装逻辑
@@ -100,7 +101,7 @@ src-tauri/
 │   │   ├── node-windows-x64.zip       # 28 MB
 │   │   └── node-linux-x64.tar.gz      # 45 MB
 │   └── openclaw/
-│       └── jerryan999-openclaw-zh-*.tgz  # ~15 MB
+│       └── openclaw.tgz  # ~15 MB（官方 openclaw@latest）
 ├── src/
 │   └── utils/
 │       └── bundled.rs                 # 资源提取逻辑
@@ -120,8 +121,9 @@ src-tauri/
 
 ```bash
 cd src-tauri/resources/openclaw
-rm *.tgz
-npm pack @jerryan999/openclaw-zh
+rm -f openclaw.tgz openclaw-*.tgz
+npm pack openclaw@latest
+mv openclaw-*.tgz openclaw.tgz
 ```
 
 ## 🎛️ 配置选项

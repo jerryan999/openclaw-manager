@@ -12,11 +12,12 @@ use commands::{config, diagnostics, installer, process, service};
 
 fn main() {
     // 初始化日志 - 默认显示 info 级别日志
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info")
-    ).init();
-    
-    log::info!("🦞 OpenClaw Manager 启动");
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
+    log::info!(
+        "🦞 OpenClaw Manager 启动 (v{})",
+        env!("CARGO_PKG_VERSION")
+    );
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -35,6 +36,7 @@ fn main() {
             process::get_openclaw_version,
             process::check_port_in_use,
             // 配置管理
+            config::get_app_version,
             config::get_config,
             config::save_config,
             config::get_env_value,
@@ -73,10 +75,13 @@ fn main() {
             installer::install_openclaw,
             installer::init_openclaw_config,
             installer::open_install_terminal,
+            installer::open_debug_terminal,
             installer::uninstall_openclaw,
             // 版本更新
             installer::check_openclaw_update,
             installer::update_openclaw,
+            installer::get_openclaw_channel,
+            installer::set_openclaw_channel,
         ])
         .run(tauri::generate_context!())
         .expect("运行 Tauri 应用时发生错误");

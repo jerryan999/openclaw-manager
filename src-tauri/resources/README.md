@@ -12,9 +12,9 @@ resources/
 │   ├── windows-x64/  # Windows 64位
 │   └── linux-x64/    # Linux 64位
 ├── git/              # Portable Git（仅 Windows，可选）
-│   └── git-portable-windows-x64.7z
+│   └── git-portable.zip      # 或 PortableGit.zip（须为 .zip）
 └── openclaw/         # OpenClaw npm 包（离线安装）
-    └── openclaw-zh.tgz   # 打包的 npm 包
+    └── openclaw.tgz      # 打包的 npm 包（官方 openclaw@latest）
 ```
 
 ## 下载资源
@@ -47,29 +47,37 @@ curl -o src-tauri/resources/nodejs/node-linux-x64.tar.gz \
 # 创建目录
 mkdir -p src-tauri/resources/openclaw
 
-# 下载并打包 OpenClaw（不需要 Git）
+# 下载并打包 OpenClaw（官方版，不需要 Git）
 cd src-tauri/resources/openclaw
-npm pack @jerryan999/openclaw-zh
+npm pack openclaw@latest
 
-# 生成的文件类似：jerryan999-openclaw-zh-1.0.0.tgz
-# 重命名为统一的名字
-mv jerryan999-openclaw-zh-*.tgz openclaw-zh.tgz
+# 生成的文件类似：openclaw-1.0.0.tgz，重命名为统一名字
+mv openclaw-*.tgz openclaw.tgz
 ```
 
 ### 3. Portable Git（可选，仅 Windows）
 
-如果不想要求用户安装 Git，可以打包 Portable Git：
+如果不想要求用户安装系统 Git，可打包 Portable Git（应用内仅支持 **.zip** 格式）：
 
-```bash
-# 下载 Portable Git for Windows
-# 访问 https://github.com/git-for-windows/git/releases
-# 下载 PortableGit-<version>-64-bit.7z (~50MB)
+**方式一：用脚本下载（推荐）**
 
-mkdir -p src-tauri/resources/git
-# 将下载的文件放到 src-tauri/resources/git/git-portable-windows-x64.7z
+在 `src-tauri/resources` 下执行：
+
+```powershell
+.\download-resources.ps1
 ```
 
-**注意**：实际上使用离线 .tgz 安装方式后，**不再需要 Git**，这是更推荐的方案。
+脚本会优先把当前系统 Git 打包为 `git/git-portable.zip`。
+
+**方式二：手动下载**
+
+1. 打开 https://github.com/git-for-windows/git/releases
+2. 下载 Git for Windows 的便携版 zip（约 40–60MB）
+3. 放入 `src-tauri/resources/git/` 并命名为以下之一：
+   - `git-portable.zip`
+   - `PortableGit.zip`
+
+**注意**：使用离线 .tgz 安装 OpenClaw 时**不依赖 Git**；仅在线安装或部分命令需要 Git。
 
 ## 注意事项
 
