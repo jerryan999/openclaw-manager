@@ -1193,10 +1193,15 @@ Write-Host "[提示] 可继续手动执行命令排查问题。" -ForegroundColo
         const UTF8_BOM: &[u8] = b"\xEF\xBB\xBF";
         let with_bom = [UTF8_BOM, script_body.as_bytes()].concat();
         std::fs::write(&tmp, &with_bom).map_err(|e| format!("写入脚本失败: {}", e))?;
-        // 直接用 Command 启动 powershell -File <path>，避免通过 -Command 传参导致的路径/引号解析问题
+        // 强制新开 PowerShell 窗口，避免复用当前终端会话
+        let tmp_escaped = tmp.display().to_string().replace('\'', "''");
+        let launcher = format!(
+            "Start-Process powershell -ArgumentList @('-NoExit','-ExecutionPolicy','Bypass','-File','{}')",
+            tmp_escaped
+        );
         std::process::Command::new("powershell")
-            .args(["-NoExit", "-ExecutionPolicy", "Bypass", "-File"])
-            .arg(&tmp)
+            .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"])
+            .arg(launcher)
             .spawn()
             .map_err(|e| format!("启动诊断终端失败: {}", e))?;
         Ok("已打开诊断终端".to_string())
