@@ -1,6 +1,7 @@
 use crate::models::{AITestResult, ChannelTestResult, DiagnosticResult, SystemInfo};
 use crate::utils::{file, platform, shell};
 use log::{debug, error, info, warn};
+use std::path::PathBuf;
 use tauri::command;
 
 /// 去除 ANSI 转义序列（颜色代码等）
@@ -647,11 +648,21 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
         "unknown".to_string()
     };
 
-    let openclaw_installed = shell::get_openclaw_path().is_some();
-    let openclaw_version = if openclaw_installed {
-        shell::run_openclaw(&["--version"]).ok()
+    let (openclaw_installed, openclaw_version) = if platform::is_windows() {
+        let runtime_openclaw_path = get_windows_runtime_openclaw_path();
+        let runtime_openclaw_version = runtime_openclaw_path.as_ref().and_then(|p| {
+            let cmd = format!("\"{}\" --version", p.display());
+            shell::run_cmd_output(&cmd).ok().map(|v| v.trim().to_string())
+        });
+        (runtime_openclaw_version.is_some(), runtime_openclaw_version)
     } else {
-        None
+        let installed = shell::get_openclaw_path().is_some();
+        let version = if installed {
+            shell::run_openclaw(&["--version"]).ok()
+        } else {
+            None
+        };
+        (installed, version)
     };
 
     let node_version = shell::run_command_output("node", &["--version"]).ok();
@@ -665,6 +676,41 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
         node_version,
         config_dir: platform::get_config_dir(),
     })
+}
+
+fn get_windows_runtime_root_path() -> PathBuf {
+    if let Some(local) = dirs::data_local_dir() {
+        return local.join("OpenClawManager").join("runtime");
+    }
+    if let Some(home) = dirs::home_dir() {
+        return home
+            .join("AppData\\Local")
+            .join("OpenClawManager")
+            .join("runtime");
+    }
+    PathBuf::from("C:\\OpenClawManager\\runtime")
+}
+
+fn get_windows_runtime_openclaw_path() -> Option<PathBuf> {
+    let rt = get_windows_runtime_root_path();
+    let npm_global = rt.join("npm-global");
+    let node_dir = rt.join("node");
+    let candidates = vec![
+        npm_global.join("openclaw.cmd"),
+        npm_global
+            .join("node_modules")
+            .join(".bin")
+            .join("openclaw.cmd"),
+        npm_global.join("openclaw.ps1"),
+        npm_global.join("openclaw"),
+        node_dir.join("openclaw.cmd"),
+        node_dir
+            .join("node_modules")
+            .join(".bin")
+            .join("openclaw.cmd"),
+    ];
+
+    candidates.into_iter().find(|p| p.exists())
 }
 
 /// 启动渠道登录（如 WhatsApp 扫码）
