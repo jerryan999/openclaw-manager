@@ -140,8 +140,9 @@ export function Dashboard({ envStatus, onSetupComplete }: DashboardProps) {
     show: { opacity: 1, y: 0 },
   };
 
-  // 检查环境是否就绪
-  const needsSetup = envStatus && !envStatus.ready;
+  // 需要显示环境向导：
+  // 1) 依赖未就绪；2) OpenClaw 未安装（即使依赖已就绪，也要让用户可见并手动安装）
+  const needsSetup = envStatus && (!envStatus.ready || !envStatus.openclaw_installed);
 
   return (
     <div className="h-full overflow-y-auto scroll-container pr-2">
