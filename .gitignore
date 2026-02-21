@@ -33,3 +33,4 @@ src-tauri/Cargo.lock
 src-tauri/resources/nodejs/*.tar.gz
 src-tauri/resources/nodejs/*.zip
 src-tauri/resources/openclaw/*.tgz
+src-tauri/resources/git/*.zip
