@@ -250,12 +250,21 @@ fn extract_zip(zip_path: &Path, output_dir: &Path) -> io::Result<()> {
         let mut entry = archive.by_index(i).map_err(zip_err_to_io)?;
         let out_path = output_dir.join(entry.mangled_name());
         if entry.name().ends_with('/') {
+            if out_path.exists() && !out_path.is_dir() {
+                fs::remove_file(&out_path)?;
+            }
             fs::create_dir_all(&out_path)?;
             continue;
         }
 
         if let Some(parent) = out_path.parent() {
+            if parent.exists() && !parent.is_dir() {
+                fs::remove_file(parent)?;
+            }
             fs::create_dir_all(parent)?;
+        }
+        if out_path.exists() && out_path.is_dir() {
+            fs::remove_dir_all(&out_path)?;
         }
         let mut out = fs::File::create(&out_path)?;
         io::copy(&mut entry, &mut out)?;
@@ -323,7 +332,11 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
 #[cfg(windows)]
 fn move_or_copy_dir(src: &Path, dst: &Path) -> io::Result<()> {
     if dst.exists() {
-        fs::remove_dir_all(dst)?;
+        if dst.is_dir() {
+            fs::remove_dir_all(dst)?;
+        } else {
+            fs::remove_file(dst)?;
+        }
     }
     match fs::rename(src, dst) {
         Ok(_) => Ok(()),
