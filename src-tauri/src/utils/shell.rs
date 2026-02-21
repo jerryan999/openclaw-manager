@@ -44,6 +44,10 @@ pub struct WindowsOfflineRuntime {
 }
 
 static OPENCLAW_PATH_LOGGED: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+#[cfg(windows)]
+static WINDOWS_GIT_EXTRACT_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+#[cfg(windows)]
+static WINDOWS_RUNTIME_PREP_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 fn log_openclaw_path_once(path: &str, offline_runtime: bool) {
     let lock = OPENCLAW_PATH_LOGGED.get_or_init(|| Mutex::new(None));
@@ -537,6 +541,11 @@ fn find_git_executable(root: &Path) -> Option<PathBuf> {
 /// 若未打包 Git 资源，本函数不会创建或写入 git 目录；若之前解压后内容被删，会留下空目录。
 #[cfg(windows)]
 fn ensure_windows_git_runtime(runtime_root: &Path) -> io::Result<Option<PathBuf>> {
+    let _extract_guard = WINDOWS_GIT_EXTRACT_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .map_err(|_| io::Error::new(io::ErrorKind::Other, "Git 解压锁获取失败"))?;
+
     let git_root = runtime_root.join("git");
     if let Some(exe) = find_git_executable(&git_root) {
         return Ok(Some(exe));
@@ -674,6 +683,11 @@ pub fn ensure_windows_git_if_bundled() -> Option<PathBuf> {
 
 #[cfg(windows)]
 pub fn get_windows_offline_runtime() -> Result<WindowsOfflineRuntime, String> {
+    let _runtime_guard = WINDOWS_RUNTIME_PREP_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .map_err(|_| "离线 runtime 锁获取失败".to_string())?;
+
     let runtime_root = get_windows_runtime_root();
     ensure_dir_all_replace_conflicts(&runtime_root)
         .map_err(|e| format!("创建离线运行时目录失败: {}", e))?;

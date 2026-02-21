@@ -1212,6 +1212,10 @@ pub async fn open_install_terminal(install_type: String) -> Result<String, Strin
 #[command]
 pub async fn open_debug_terminal() -> Result<String, String> {
     if platform::is_windows() {
+        if let Err(e) = shell::get_windows_offline_runtime() {
+            warn!("[诊断终端] 预热离线 runtime 失败，将继续打开终端: {}", e);
+        }
+
         let rt_path = dirs::data_local_dir()
             .map(|d| d.join("OpenClawManager").join("runtime"))
             .unwrap_or_else(|| std::path::PathBuf::from("C:\\OpenClawManager\\runtime"))
