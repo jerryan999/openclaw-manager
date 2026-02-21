@@ -6,20 +6,16 @@ import {
   FlaskConical,
   ScrollText,
   Settings,
+  MessageCircle,
 } from 'lucide-react';
 import { PageType } from '../../App';
 import clsx from 'clsx';
-
-interface ServiceStatus {
-  running: boolean;
-  pid: number | null;
-  port: number;
-}
+import { open } from '@tauri-apps/plugin-shell';
+import { WECHAT_QR_URL } from '../../lib/appConfig';
 
 interface SidebarProps {
   currentPage: PageType;
   onNavigate: (page: PageType) => void;
-  serviceStatus: ServiceStatus | null;
 }
 
 const menuItems: { id: PageType; label: string; icon: React.ElementType }[] = [
@@ -31,8 +27,7 @@ const menuItems: { id: PageType; label: string; icon: React.ElementType }[] = [
   { id: 'settings', label: '设置', icon: Settings },
 ];
 
-export function Sidebar({ currentPage, onNavigate, serviceStatus }: SidebarProps) {
-  const isRunning = serviceStatus?.running ?? false;
+export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   return (
     <aside className="w-64 bg-dark-800 border-r border-dark-600 flex flex-col">
       {/* Logo 区域（macOS 标题栏拖拽） */}
@@ -82,17 +77,16 @@ export function Sidebar({ currentPage, onNavigate, serviceStatus }: SidebarProps
         </ul>
       </nav>
 
-      {/* 底部信息 */}
+      {/* 底部：交流群入口 */}
       <div className="p-4 border-t border-dark-600">
-        <div className="px-4 py-3 bg-dark-700 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <div className={clsx('status-dot', isRunning ? 'running' : 'stopped')} />
-            <span className="text-xs text-gray-400">
-              {isRunning ? '服务运行中' : '服务未启动'}
-            </span>
-          </div>
-          <p className="text-xs text-gray-500">端口: {serviceStatus?.port ?? 18789}</p>
-        </div>
+        <button
+          type="button"
+          onClick={() => open(WECHAT_QR_URL).catch(() => {})}
+          className="w-full px-4 py-3 flex items-center justify-center gap-2 rounded-xl border border-green-500/25 bg-green-500/10 hover:bg-green-500/20 transition-colors text-green-400/90 hover:text-green-300"
+        >
+          <MessageCircle size={18} />
+          <span className="text-sm font-medium">扫码加入交流群</span>
+        </button>
       </div>
     </aside>
   );

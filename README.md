@@ -324,6 +324,12 @@ cd src-tauri && cargo test
 
 应用会读取 `~/.openclaw/env` 中的环境变量配置。
 
+## 💬 微信学习交流群
+
+扫码加入交流群：
+
+![微信学习交流群](public/wechat-group.jpg)
+
 ## 🤝 贡献指南
 
 1. Fork 项目

@@ -28,12 +28,6 @@ export interface EnvironmentStatus {
   os: string;
 }
 
-interface ServiceStatus {
-  running: boolean;
-  pid: number | null;
-  port: number;
-}
-
 interface UpdateInfo {
   update_available: boolean;
   current_version: string | null;
@@ -53,8 +47,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
   const [isReady, setIsReady] = useState<boolean | null>(null);
   const [envStatus, setEnvStatus] = useState<EnvironmentStatus | null>(null);
-  const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null);
-  
+
   // 更新相关状态
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
@@ -145,23 +138,6 @@ function App() {
   }, [checkUpdate]);
 
   // 定期获取服务状态
-  useEffect(() => {
-    // 不在 Tauri 环境中则不轮询
-    if (!isTauri()) return;
-    
-    const fetchServiceStatus = async () => {
-      try {
-        const status = await invoke<ServiceStatus>('get_service_status');
-        setServiceStatus(status);
-      } catch {
-        // 静默处理轮询错误
-      }
-    };
-    fetchServiceStatus();
-    const interval = setInterval(fetchServiceStatus, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
   const handleSetupComplete = useCallback(() => {
     appLogger.info('安装向导完成');
     checkEnvironment(); // 重新检查环境
@@ -310,7 +286,7 @@ function App() {
       </AnimatePresence>
       
       {/* 侧边栏 */}
-      <Sidebar currentPage={currentPage} onNavigate={handleNavigate} serviceStatus={serviceStatus} />
+      <Sidebar currentPage={currentPage} onNavigate={handleNavigate} />
       
       {/* 主内容区 */}
       <div className="flex-1 flex flex-col overflow-hidden">

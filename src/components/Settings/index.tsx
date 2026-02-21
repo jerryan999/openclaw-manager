@@ -10,7 +10,10 @@ import {
   Trash2,
   AlertTriangle,
   X,
+  MessageCircle,
+  ExternalLink,
 } from 'lucide-react';
+import { WECHAT_QR_URL } from '../../lib/appConfig';
 
 interface InstallResult {
   success: boolean;
@@ -50,10 +53,18 @@ export function Settings({ onEnvironmentChange }: SettingsProps) {
     try {
       const { open } = await import('@tauri-apps/plugin-shell');
       const home = await invoke<{ config_dir: string }>('get_system_info');
-      // 尝试打开配置目录
       await open(home.config_dir);
     } catch (e) {
       console.error('打开目录失败:', e);
+    }
+  };
+
+  const openWechatQr = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-shell');
+      await open(WECHAT_QR_URL);
+    } catch (e) {
+      console.error('打开链接失败:', e);
     }
   };
 
@@ -187,6 +198,29 @@ export function Settings({ onEnvironmentChange }: SettingsProps) {
                 <div className="w-11 h-6 bg-dark-500 peer-focus:ring-2 peer-focus:ring-claw-500/50 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-claw-500"></div>
               </label>
             </div>
+          </div>
+        </div>
+
+        {/* 微信学习交流群 */}
+        <div className="bg-dark-700 rounded-2xl p-6 border border-dark-500">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+              <MessageCircle size={20} className="text-green-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">微信学习交流群</h3>
+              <p className="text-xs text-gray-500">扫码加入，交流使用心得与获取帮助</p>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-3 pt-2 pb-1">
+            <button
+              type="button"
+              onClick={openWechatQr}
+              className="text-claw-400 hover:text-claw-300 text-sm font-medium inline-flex items-center gap-1"
+            >
+              <ExternalLink size={16} />
+              查看微信群二维码（GitHub）
+            </button>
           </div>
         </div>
 
