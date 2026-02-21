@@ -812,36 +812,58 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
 $ErrorActionPreference = 'Stop'
 $runtimePrefix = "{}"
 $runtimeOpenClawCmd = "{}"
+$runtimeOpenClawCmdBin = "{}"
+$runtimeNpmCmd = "{}"
+$runtimeNodeExe = "{}"
 
-# 检查 Node.js
-$nodeVersion = node --version 2>$null
-if (-not $nodeVersion) {{
-    Write-Host "错误：请先安装 Node.js"
+# 选择 npm（优先 runtime，其次系统）
+$npmCmd = $null
+if (Test-Path $runtimeNpmCmd) {{
+    $npmCmd = $runtimeNpmCmd
+}} else {{
+    $npmResolved = Get-Command npm -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($npmResolved -and $npmResolved.Source) {{
+        $npmCmd = $npmResolved.Source
+    }}
+}}
+if (-not $npmCmd) {{
+    Write-Host "错误：未找到 npm（runtime 与系统均不可用）"
     exit 1
 }}
 
 Write-Host "使用离线包安装 OpenClaw（无需 Git）..."
 Write-Host "包路径: {}"
+New-Item -ItemType Directory -Path $runtimePrefix -Force | Out-Null
 $env:npm_config_prefix = $runtimePrefix
 $env:NPM_CONFIG_PREFIX = $runtimePrefix
-npm install -g "{}" --unsafe-perm --no-audit --fund=false --loglevel=error
+Write-Host ("npm: " + $npmCmd)
+& $npmCmd config get prefix | ForEach-Object {{ Write-Host ("npm prefix(before): " + $_) }}
+& $npmCmd install -g "{}" --prefix "$runtimePrefix" --unsafe-perm --no-audit --fund=false --loglevel=error
+& $npmCmd config get prefix | ForEach-Object {{ Write-Host ("npm prefix(after): " + $_) }}
+& $npmCmd root -g | ForEach-Object {{ Write-Host ("npm root -g: " + $_) }}
 
 # 刷新 PATH
 $npmPrefix = $runtimePrefix
 $env:Path = "$env:Path;$npmPrefix"
 
 # 验证安装（只认 runtime 中的 openclaw.cmd，避免误用系统安装）
-if (Test-Path $runtimeOpenClawCmd) {{
+if ((Test-Path $runtimeOpenClawCmd) -or (Test-Path $runtimeOpenClawCmdBin)) {{
     $openclawVersion = & $runtimeOpenClawCmd --version 2>$null
+    if (-not $openclawVersion -and (Test-Path $runtimeOpenClawCmdBin)) {{
+      $openclawVersion = & $runtimeOpenClawCmdBin --version 2>$null
+    }}
     Write-Host "OpenClaw 安装成功(runtime): $openclawVersion"
     exit 0
 }} else {{
-    Write-Host ("OpenClaw 安装失败: runtime 未找到 " + $runtimeOpenClawCmd)
+    Write-Host ("OpenClaw 安装失败: runtime 未找到 " + $runtimeOpenClawCmd + " 或 " + $runtimeOpenClawCmdBin)
     exit 1
 }}
 "#,
             runtime_prefix.display(),
             runtime_openclaw_cmd.display(),
+            runtime_openclaw_cmd_bin.display(),
+            runtime_root.join("node").join("npm.cmd").display(),
+            runtime_root.join("node").join("node.exe").display(),
             package_path,
             package_path,
         )
@@ -852,11 +874,22 @@ if (Test-Path $runtimeOpenClawCmd) {{
 $ErrorActionPreference = 'Stop'
 $runtimePrefix = "{}"
 $runtimeOpenClawCmd = "{}"
+$runtimeOpenClawCmdBin = "{}"
+$runtimeNpmCmd = "{}"
+$runtimeNodeExe = "{}"
 
-# 检查 Node.js
-$nodeVersion = node --version 2>$null
-if (-not $nodeVersion) {{
-    Write-Host "错误：请先安装 Node.js"
+# 选择 npm（优先 runtime，其次系统）
+$npmCmd = $null
+if (Test-Path $runtimeNpmCmd) {{
+    $npmCmd = $runtimeNpmCmd
+}} else {{
+    $npmResolved = Get-Command npm -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($npmResolved -and $npmResolved.Source) {{
+        $npmCmd = $npmResolved.Source
+    }}
+}}
+if (-not $npmCmd) {{
+    Write-Host "错误：未找到 npm（runtime 与系统均不可用）"
     exit 1
 }}
 
@@ -870,27 +903,38 @@ if (-not $gitVersion) {{
 }}
 
 Write-Host "使用 npm 在线安装 OpenClaw..."
+New-Item -ItemType Directory -Path $runtimePrefix -Force | Out-Null
 $env:npm_config_prefix = $runtimePrefix
 $env:NPM_CONFIG_PREFIX = $runtimePrefix
-npm install -g @jerryan999/openclaw-zh --unsafe-perm --no-audit --fund=false --loglevel=error
+Write-Host ("npm: " + $npmCmd)
+& $npmCmd config get prefix | ForEach-Object { Write-Host ("npm prefix(before): " + $_) }
+& $npmCmd install -g @jerryan999/openclaw-zh --prefix "$runtimePrefix" --unsafe-perm --no-audit --fund=false --loglevel=error
+& $npmCmd config get prefix | ForEach-Object { Write-Host ("npm prefix(after): " + $_) }
+& $npmCmd root -g | ForEach-Object { Write-Host ("npm root -g: " + $_) }
 
 # 刷新 PATH
 $npmPrefix = $runtimePrefix
 $env:Path = "$env:Path;$npmPrefix"
 
 # 验证安装（只认 runtime 中的 openclaw.cmd，避免误用系统安装）
-if (Test-Path $runtimeOpenClawCmd) {{
+if ((Test-Path $runtimeOpenClawCmd) -or (Test-Path $runtimeOpenClawCmdBin)) {{
     $openclawVersion = & $runtimeOpenClawCmd --version 2>$null
+    if (-not $openclawVersion -and (Test-Path $runtimeOpenClawCmdBin)) {{
+      $openclawVersion = & $runtimeOpenClawCmdBin --version 2>$null
+    }}
     Write-Host "OpenClaw 安装成功(runtime): $openclawVersion"
     exit 0
 }} else {{
-    Write-Host ("OpenClaw 安装失败: runtime 未找到 " + $runtimeOpenClawCmd)
+    Write-Host ("OpenClaw 安装失败: runtime 未找到 " + $runtimeOpenClawCmd + " 或 " + $runtimeOpenClawCmdBin)
     exit 1
 }}
 "#
             ,
             runtime_prefix.display(),
-            runtime_openclaw_cmd.display()
+            runtime_openclaw_cmd.display(),
+            runtime_openclaw_cmd_bin.display(),
+            runtime_root.join("node").join("npm.cmd").display(),
+            runtime_root.join("node").join("node.exe").display(),
         )
     };
 
