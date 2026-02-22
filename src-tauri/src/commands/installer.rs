@@ -1258,6 +1258,11 @@ pub async fn init_openclaw_config() -> Result<InstallResult, String> {
         }
     }
 
+    // 确保 agent 模板与 workspace/MEMORY.md 等存在，避免 openclaw agent/tools 报 Missing template 或 ENOENT
+    if let Err(e) = shell::ensure_agent_templates_in_workspace(Path::new(&config_dir)) {
+        warn!("[初始化配置] 创建 workspace 模板失败（可忽略）: {}", e);
+    }
+
     // 设置 gateway mode 为 local
     info!("[初始化配置] 执行: openclaw config set gateway.mode local");
     let result = shell::run_openclaw(&["config", "set", "gateway.mode", "local"]);

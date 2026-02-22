@@ -113,7 +113,7 @@ function LearningCard({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-semibold text-white mb-1">{item.title}</h3>
-            <p className="text-sm text-gray-400 mb-2">{item.description}</p>
+            <p className="text-sm text-gray-400 mb-2 whitespace-pre-line">{item.description}</p>
             {item.tags && item.tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-3">
                 {item.tags.map((tag) => (

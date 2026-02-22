@@ -2,17 +2,17 @@
   "cases": [
     {
       "id": "new-session-tips",
-      "title": "新会话快速上手",
-      "description": "复制到 OpenClaw 新会话中发送，获取当前环境下的入门指引与可做事项。",
-      "prompt": "我是 OpenClaw 用户，刚打开一个新会话。请基于「当前是 OpenClaw 对话环境」简要说明：\n1. 在这个会话里你能帮我做哪些事（如执行技能、查状态、配置建议等）；\n2. 我想安装技能或修改提示词时，该怎么说、怎么操作；\n3. 给一句简短的最佳实践。",
+      "title": "OpenClaw 能做什么？快速上手",
+      "description": "复制到新会话发送，一键了解 OpenClaw 的核心能力与典型用法。",
+      "prompt": "我是 OpenClaw 新用户，想快速了解「OpenClaw 能做什么」。请用简洁、有条理的方式说明：\n1. OpenClaw 的核心能力有哪些；\n2. 我能用 OpenClaw 完成的典型场景（举 3～5 个具体例子）；\n3. 接下来第一步建议我做什么（安装技能、改提示词或直接提需求等），并给一句简短最佳实践。",
       "icon": "messageSquare",
       "tags": ["新手"]
     },
     {
       "id": "download-skill-prompt",
-      "title": "添加技能",
-      "description": "安装、检查已安装技能，并设置或优化系统提示词，适合初次配置或扩展能力。",
-      "prompt": "请帮我做这些 OpenClaw 相关设置：\n1. 检查并列出当前已安装的技能与插件；\n2. 若有官方推荐技能（如 @openclaw/download 等），请指导或协助我安装；\n3. 帮我设置或优化系统提示词（system prompt），让回复更符合我的使用场景。",
+      "title": "安装技能",
+      "description": "Clawhub 有上万个技能，在 https://clawhub.ai/skills 可浏览、搜索。\n\n用法：在页面选好要装的技能，把技能名填进下面提示词里再发送即可，其余可按需改。\n\n把其中的技能名改成你在 Clawhub 选中的那个（仅技能名，不包含 owner）。",
+      "prompt": "请帮助我安装这个技能，执行命令：clawhub install weather",
       "icon": "download",
       "tags": ["技能"]
     },

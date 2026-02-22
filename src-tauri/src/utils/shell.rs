@@ -1126,8 +1126,12 @@ pub fn get_openclaw_workspace_dir() -> Result<PathBuf, String> {
     Ok(dir)
 }
 
+/// openclaw tools 可能读取的工作区根文件（若再报 read failed: ... workspace/XXX.md，在此追加 "XXX.md"）
+const WORKSPACE_ROOT_FILES: &[&str] = &["MEMORY.md"];
+
 /// 在指定工作区下确保存在 docs/reference/templates 及所需模板文件；
 /// 若文件不存在则写入占位内容，避免 openclaw agent 报 Missing workspace template。
+/// 同时确保 workspace 子目录下的 MEMORY.md 等文件存在，避免 tools 报 ENOENT。
 pub fn ensure_agent_templates_in_workspace(workspace: &Path) -> Result<(), String> {
     let templates_dir = workspace.join("docs").join("reference").join("templates");
     fs::create_dir_all(&templates_dir).map_err(|e| format!("创建模板目录失败: {}", e))?;
@@ -1138,6 +1142,17 @@ pub fn ensure_agent_templates_in_workspace(workspace: &Path) -> Result<(), Strin
         if !path.exists() {
             fs::write(&path, placeholder).map_err(|e| format!("写入 {} 失败: {}", name, e))?;
             debug!("[Shell] 已创建占位模板: {}", path.display());
+        }
+    }
+
+    // 确保 workspace 子目录及 tools 会读的文件（如 MEMORY.md）存在，避免 [tools] read failed: ENOENT
+    let workspace_sub = workspace.join("workspace");
+    fs::create_dir_all(&workspace_sub).map_err(|e| format!("创建 workspace 目录失败: {}", e))?;
+    for name in WORKSPACE_ROOT_FILES {
+        let path = workspace_sub.join(name);
+        if !path.exists() {
+            fs::write(&path, placeholder).map_err(|e| format!("写入 {} 失败: {}", name, e))?;
+            debug!("[Shell] 已创建 workspace 文件: {}", path.display());
         }
     }
     Ok(())
