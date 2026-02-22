@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, Check, Download, Coins, MessageSquare, Loader2 } from 'lucide-react';
+import { Copy, Check, Download, Coins, MessageSquare, Loader2, Search } from 'lucide-react';
 import clsx from 'clsx';
 import { LEARNING_CASES_URL } from '../../lib/appConfig';
 
@@ -165,6 +165,7 @@ export function Learning() {
   const [selectedTag, setSelectedTag] = useState<string>(ALL_TAGS_ID);
   const [cases, setCases] = useState<LearningCase[]>(DEFAULT_LEARNING_CASES);
   const [loading, setLoading] = useState(true);
+  const [searchKeyword, setSearchKeyword] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -187,13 +188,22 @@ export function Learning() {
     };
   }, []);
 
-  const filteredCases = useMemo(
-    () =>
+  const filteredCases = useMemo(() => {
+    let list =
       selectedTag === ALL_TAGS_ID
         ? cases
-        : cases.filter((c) => c.tags?.includes(selectedTag)),
-    [cases, selectedTag]
-  );
+        : cases.filter((c) => c.tags?.includes(selectedTag));
+    const kw = searchKeyword.trim().toLowerCase();
+    if (kw) {
+      list = list.filter(
+        (c) =>
+          c.title.toLowerCase().includes(kw) ||
+          (c.description && c.description.toLowerCase().includes(kw)) ||
+          c.prompt.toLowerCase().includes(kw)
+      );
+    }
+    return list;
+  }, [cases, selectedTag, searchKeyword]);
 
   const handleCopy = async (id: string, text: string) => {
     try {
@@ -212,7 +222,19 @@ export function Learning() {
         animate={{ opacity: 1 }}
         className="space-y-6"
       >
-        {/* 顶部标签筛选：单选 */}
+        {/* 顶部搜索 */}
+        <div className="flex items-center gap-2">
+          <Search size={18} className="text-gray-500 shrink-0" />
+          <input
+            type="text"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            placeholder="搜索案例（标题、描述、提示词）"
+            className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-dark-700 border border-dark-500 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-claw-500/50"
+          />
+        </div>
+
+        {/* 标签筛选：单选 */}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
