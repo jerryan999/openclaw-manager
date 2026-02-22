@@ -9,11 +9,12 @@ import { Channels } from './components/Channels';
 import { Settings } from './components/Settings';
 import { Testing } from './components/Testing';
 import { Logs } from './components/Logs';
+import { Learning } from './components/Learning';
 import { appLogger } from './lib/logger';
 import { isTauri } from './lib/tauri';
 import { Download, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
-export type PageType = 'dashboard' | 'ai' | 'channels' | 'testing' | 'logs' | 'settings';
+export type PageType = 'dashboard' | 'learning' | 'ai' | 'channels' | 'testing' | 'logs' | 'settings';
 
 let hasBootEnvironmentChecked = false;
 
@@ -168,6 +169,7 @@ function App() {
 
     const pages: Record<PageType, JSX.Element> = {
       dashboard: <Dashboard envStatus={envStatus} onSetupComplete={handleSetupComplete} />,
+      learning: <Learning />,
       ai: <AIConfig />,
       channels: <Channels />,
       testing: <Testing />,

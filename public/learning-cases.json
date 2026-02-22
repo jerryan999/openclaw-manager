@@ -1,0 +1,28 @@
+{
+  "cases": [
+    {
+      "id": "new-session-tips",
+      "title": "新会话快速上手",
+      "description": "复制到 OpenClaw 新会话中发送，获取当前环境下的入门指引与可做事项。",
+      "prompt": "我是 OpenClaw 用户，刚打开一个新会话。请基于「当前是 OpenClaw 对话环境」简要说明：\n1. 在这个会话里你能帮我做哪些事（如执行技能、查状态、配置建议等）；\n2. 我想安装技能或修改提示词时，该怎么说、怎么操作；\n3. 给一句简短的最佳实践。",
+      "icon": "messageSquare",
+      "tags": ["新手"]
+    },
+    {
+      "id": "download-skill-prompt",
+      "title": "添加技能",
+      "description": "安装、检查已安装技能，并设置或优化系统提示词，适合初次配置或扩展能力。",
+      "prompt": "请帮我做这些 OpenClaw 相关设置：\n1. 检查并列出当前已安装的技能与插件；\n2. 若有官方推荐技能（如 @openclaw/download 等），请指导或协助我安装；\n3. 帮我设置或优化系统提示词（system prompt），让回复更符合我的使用场景。",
+      "icon": "download",
+      "tags": ["技能"]
+    },
+    {
+      "id": "save-token",
+      "title": "节约成本 / 省 Token",
+      "description": "在保证效果的前提下，减少 API 调用与上下文长度，涉及模型选择与用法建议。",
+      "prompt": "请以「节约 Token、控制成本」为目标，给出一套 OpenClaw 使用建议：\n1. 系统提示词如何写得简短但有效；\n2. 对话时如何避免重复发送过长上下文；\n3. 模型选择与 max_tokens 设置建议；\n4. 是否有摘要、分步等技巧可以少用 Token。",
+      "icon": "coins",
+      "tags": ["成本", "模型"]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
+  BookOpen,
   Bot,
   MessageSquare,
   FlaskConical,
@@ -77,8 +78,8 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
         </ul>
       </nav>
 
-      {/* 底部：交流群入口 */}
-      <div className="p-4 border-t border-dark-600">
+      {/* 底部：交流群入口 + 学习天地 */}
+      <div className="p-4 border-t border-dark-600 space-y-2">
         <button
           type="button"
           onClick={() => open(WECHAT_QR_URL).catch(() => {})}
@@ -86,6 +87,26 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
         >
           <MessageCircle size={18} />
           <span className="text-sm font-medium">扫码加入交流群</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate('learning')}
+          className={clsx(
+            'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all relative',
+            currentPage === 'learning'
+              ? 'text-white bg-claw-500/20 border border-claw-500/40'
+              : 'border border-dark-500 bg-dark-600 hover:bg-dark-500 text-gray-300 hover:text-white'
+          )}
+        >
+          {currentPage === 'learning' && (
+            <motion.div
+              layoutId="activeIndicatorBottom"
+              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-claw-500 rounded-r-full"
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            />
+          )}
+          <BookOpen size={18} />
+          <span>学习天地</span>
         </button>
       </div>
     </aside>
