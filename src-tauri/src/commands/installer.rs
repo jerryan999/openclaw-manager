@@ -1309,6 +1309,7 @@ pub async fn open_debug_terminal() -> Result<String, String> {
             .to_string();
         let script_body = r#"$rt = "__RUNTIME_PATH__"
 $p1 = [IO.Path]::Combine($rt,'node'); $p2 = [IO.Path]::Combine($rt,'npm-global'); $p3 = [IO.Path]::Combine($rt,'git','cmd'); $p4 = [IO.Path]::Combine($rt,'git','mingw64','bin'); $env:PATH = "$p1;$p2;$p3;$p4;$env:PATH"
+function global:clawhub { & npx --yes clawhub@latest @args }
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "    OpenClaw 诊断终端" -ForegroundColor White
 Write-Host "========================================" -ForegroundColor Cyan
@@ -1408,6 +1409,7 @@ Get-Command npm -All -ErrorAction SilentlyContinue | ForEach-Object { $_.Source 
 Get-Command git -All -ErrorAction SilentlyContinue | ForEach-Object { $_.Source }
 Get-Command openclaw -All -ErrorAction SilentlyContinue | ForEach-Object { $_.Source }
 Write-Host ""
+Write-Host "[clawhub] 已提供命令: 直接输入 clawhub 即可（等价于 npx clawhub@latest）" -ForegroundColor Green
 Write-Host "[提示] 可继续手动执行命令排查问题。" -ForegroundColor Green
 "#
         .replace("__RUNTIME_PATH__", &rt_path.replace('"', "`\""));
@@ -1448,6 +1450,12 @@ apply_runtime_priority_path
 [ -f "$HOME/.zshrc" ] && source "$HOME/.zshrc" >/dev/null 2>&1 || true
 [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" >/dev/null 2>&1 || true
 apply_runtime_priority_path
+mkdir -p "$RUNTIME/npm-global/bin"
+if [ ! -x "$RUNTIME/npm-global/bin/clawhub" ]; then
+  printf '%s\n' '#!/bin/sh' 'exec npx --yes clawhub@latest "$@"' > "$RUNTIME/npm-global/bin/clawhub"
+  chmod +x "$RUNTIME/npm-global/bin/clawhub"
+fi
+prepend_path_if_dir "$RUNTIME/npm-global/bin"
 export PATH
 echo "========================================"
 echo "    OpenClaw 诊断终端"
@@ -1526,6 +1534,7 @@ type -a npm 2>/dev/null || true
 type -a git 2>/dev/null || true
 type -a openclaw 2>/dev/null || true
 echo ""
+echo "[clawhub] 已提供命令: 直接输入 clawhub 即可（等价于 npx clawhub@latest）"
 echo "[提示] 可继续手动执行命令排查问题。"
 echo ""
 unset npm_config_prefix NPM_CONFIG_PREFIX
@@ -1575,6 +1584,12 @@ apply_runtime_priority_path
 [ -f "$HOME/.zshrc" ] && source "$HOME/.zshrc" >/dev/null 2>&1 || true
 [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" >/dev/null 2>&1 || true
 apply_runtime_priority_path
+mkdir -p "$RUNTIME/npm-global/bin"
+if [ ! -x "$RUNTIME/npm-global/bin/clawhub" ]; then
+  printf '%s\n' '#!/bin/sh' 'exec npx --yes clawhub@latest "$@"' > "$RUNTIME/npm-global/bin/clawhub"
+  chmod +x "$RUNTIME/npm-global/bin/clawhub"
+fi
+prepend_path_if_dir "$RUNTIME/npm-global/bin"
 export PATH
 echo "========================================"
 echo "    OpenClaw 诊断终端"
@@ -1653,6 +1668,7 @@ type -a npm 2>/dev/null || true
 type -a git 2>/dev/null || true
 type -a openclaw 2>/dev/null || true
 echo ""
+echo "[clawhub] 已提供命令: 直接输入 clawhub 即可（等价于 npx clawhub@latest）"
 echo "[提示] 可继续手动执行命令排查问题。"
 echo ""
 unset npm_config_prefix NPM_CONFIG_PREFIX
@@ -2096,6 +2112,104 @@ async fn uninstall_openclaw_windows() -> Result<InstallResult, String> {
                 error: Some(e),
             })
         }
+    }
+}
+
+/// 通过 clawhub 预装工具（如 sonoscli）
+/// 执行: npx clawhub@latest install <tool_name>
+#[command]
+pub async fn install_clawhub_tool(tool_name: String) -> Result<InstallResult, String> {
+    let tool = tool_name.trim();
+    if tool.is_empty() {
+        return Ok(InstallResult {
+            success: false,
+            message: "工具名不能为空".to_string(),
+            error: Some("tool_name is empty".to_string()),
+        });
+    }
+    info!("[clawhub] 预装工具: {}", tool);
+
+    let result = if platform::is_windows() {
+        install_clawhub_tool_windows(tool).await
+    } else {
+        install_clawhub_tool_unix(tool).await
+    };
+
+    match &result {
+        Ok(r) if r.success => info!("[clawhub] ✓ 安装成功: {}", tool),
+        Ok(r) => warn!("[clawhub] ✗ 安装失败: {} - {}", tool, r.message),
+        Err(e) => error!("[clawhub] ✗ 错误: {} - {}", tool, e),
+    }
+    result
+}
+
+#[cfg(windows)]
+async fn install_clawhub_tool_windows(tool_name: &str) -> Result<InstallResult, String> {
+    use std::process::Command;
+    #[cfg(windows)]
+    use std::os::windows::process::CommandExt;
+
+    let path = shell::get_extended_path();
+    let mut cmd = Command::new("cmd");
+    cmd.args(["/c", "npx", "--yes", "clawhub@latest", "install", tool_name])
+        .env("PATH", &path);
+
+    if let Ok(runtime) = shell::get_windows_offline_runtime() {
+        cmd.env("npm_config_prefix", runtime.npm_prefix.display().to_string());
+        cmd.env("NPM_CONFIG_PREFIX", runtime.npm_prefix.display().to_string());
+    }
+
+    #[cfg(windows)]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+    match cmd.output() {
+        Ok(out) => {
+            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            let combined = if stderr.is_empty() { stdout } else { format!("{}\n{}", stdout, stderr) };
+            if out.status.success() {
+                Ok(InstallResult {
+                    success: true,
+                    message: format!("{} 安装成功", tool_name),
+                    error: None,
+                })
+            } else {
+                Ok(InstallResult {
+                    success: false,
+                    message: "安装失败".to_string(),
+                    error: Some(if combined.is_empty() {
+                        format!("exit code {:?}", out.status.code())
+                    } else {
+                        combined
+                    }),
+                })
+            }
+        }
+        Err(e) => Err(format!("执行 npx 失败: {}", e)),
+    }
+}
+
+#[cfg(not(windows))]
+async fn install_clawhub_tool_windows(_tool_name: &str) -> Result<InstallResult, String> {
+    Err("仅支持在 Windows 上调用".to_string())
+}
+
+async fn install_clawhub_tool_unix(tool_name: &str) -> Result<InstallResult, String> {
+    let script = format!(
+        r#"npx --yes clawhub@latest install {} 2>&1"#,
+        tool_name
+    );
+    match shell::run_bash_output(&script) {
+        Ok(_) => Ok(InstallResult {
+            success: true,
+            message: format!("{} 安装成功", tool_name),
+            error: None,
+        }),
+        Err(e) => Ok(InstallResult {
+            success: false,
+            message: "安装失败".to_string(),
+            error: Some(e),
+        }),
     }
 }
 

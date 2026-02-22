@@ -77,6 +77,7 @@ fn main() {
             installer::open_install_terminal,
             installer::open_debug_terminal,
             installer::uninstall_openclaw,
+            installer::install_clawhub_tool,
             // 版本更新
             installer::check_openclaw_update,
             installer::update_openclaw,

@@ -277,7 +277,7 @@ Windows 版支持离线运行时打包。打包时会把 `src-tauri/resources/**
 
 - 内置 Node.js：`src-tauri/resources/nodejs/node-windows-x64.zip`
 - 内置 OpenClaw 包：`src-tauri/resources/openclaw/openclaw.tgz`
-- 预装 OpenClaw 运行时：`src-tauri/resources/offline/npm-global.zip`（由 GitHub Actions 在 Windows 构建时自动生成）
+- 预装 OpenClaw 运行时：`src-tauri/resources/offline/npm-global.zip`（由 GitHub Actions 在 Windows 构建时自动生成，内含 OpenClaw + 通过 clawhub 预装的 sonoscli）
 - 可选内置 Git（便携版 zip）：放到 `src-tauri/resources/git/`，支持文件名：
   - `git-portable.zip`
   - `PortableGit.zip`

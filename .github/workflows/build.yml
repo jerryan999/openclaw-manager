@@ -98,6 +98,19 @@ jobs:
             Pop-Location
           }
 
+          # 预装 clawhub CLI 到 npm-global，使 spawn 的终端中可直接运行 clawhub 命令
+          $env:PATH = "$nodeDir;$offlinePrefix;$env:PATH"
+          $env:npm_config_prefix = $offlinePrefix
+          & $npmCmd install -g clawhub@latest --prefix $offlinePrefix --no-audit --fund=false --loglevel=error 2>&1
+          if ($LASTEXITCODE -ne 0) { Write-Host "Warning: npm install -g clawhub failed (optional)" }
+          # 预装 clawhub 工具 sonoscli
+          $npxCmd = Join-Path $nodeDir "npx.cmd"
+          if (Test-Path $npxCmd) {
+            Write-Host "Pre-installing clawhub tool: sonoscli..."
+            & $npxCmd --yes clawhub@latest install sonoscli 2>&1
+            if ($LASTEXITCODE -ne 0) { Write-Host "Warning: npx clawhub install sonoscli failed (optional), continuing without sonoscli" }
+          }
+
           $offlineZip = "src-tauri/resources/offline/npm-global.zip"
           if (Test-Path $offlineZip) { Remove-Item -Force $offlineZip }
           tar.exe -a -c -f $offlineZip -C $offlinePrefix .
