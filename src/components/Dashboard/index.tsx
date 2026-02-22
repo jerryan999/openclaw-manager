@@ -20,6 +20,7 @@ export function Dashboard({ envStatus, onSetupComplete }: DashboardProps) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const [logsError, setLogsError] = useState<string | null>(null);
   const [logsExpanded, setLogsExpanded] = useState(true);
   const [autoRefreshLogs, setAutoRefreshLogs] = useState(true);
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -42,10 +43,14 @@ export function Dashboard({ envStatus, onSetupComplete }: DashboardProps) {
   const fetchLogs = async () => {
     if (!isTauri()) return;
     try {
+      setLogsError(null);
       const result = await invoke<string[]>('get_logs', { lines: 50 });
-      setLogs(result);
-    } catch {
-      // 静默处理
+      const lines = Array.isArray(result) ? result : (result != null ? [String(result)] : []);
+      setLogs(lines);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setLogsError(msg || '获取日志失败');
+      setLogs([]);
     }
   };
 
@@ -228,7 +233,12 @@ export function Dashboard({ envStatus, onSetupComplete }: DashboardProps) {
             {/* 日志内容 */}
             {logsExpanded && (
               <div className="h-64 overflow-y-auto p-4 font-mono text-xs leading-relaxed bg-dark-800">
-                {logs.length === 0 ? (
+                {logsError ? (
+                  <div className="h-full flex flex-col items-center justify-center text-red-400 gap-1">
+                    <p>获取日志失败</p>
+                    <p className="text-gray-500 text-center max-w-full truncate" title={logsError}>{logsError}</p>
+                  </div>
+                ) : logs.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-gray-500">
                     <p>暂无日志，请先启动服务</p>
                   </div>

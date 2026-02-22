@@ -23,8 +23,9 @@ export function ServiceManager() {
   const fetchLogs = async () => {
     try {
       const result = await invoke<string[]>('get_logs', { lines: 100 });
-      setLogs(result);
-      serviceLogger.debug(`获取到 ${result.length} 行日志`);
+      const lines = Array.isArray(result) ? result : (result != null ? [String(result)] : []);
+      setLogs(lines);
+      serviceLogger.debug(`获取到 ${lines.length} 行日志`);
     } catch (e) {
       serviceLogger.error('获取日志失败', e);
     }

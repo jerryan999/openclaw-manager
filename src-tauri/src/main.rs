@@ -37,6 +37,7 @@ fn main() {
             process::check_port_in_use,
             // 配置管理
             config::get_app_version,
+            config::check_manager_update_from_latest,
             config::get_config,
             config::save_config,
             config::get_env_value,

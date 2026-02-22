@@ -43,6 +43,13 @@ export interface SystemInfo {
   config_dir: string;
 }
 
+/** Manager 自身更新检查结果 */
+export interface ManagerUpdateInfo {
+  update_available: boolean;
+  current_version: string;
+  latest_version: string;
+}
+
 // AI Provider 选项（旧版兼容）
 export interface AIProviderOption {
   id: string;
@@ -157,6 +164,9 @@ export const api = {
   // 系统信息
   getSystemInfo: () => invokeWithLog<SystemInfo>('get_system_info'),
   getAppVersion: () => invokeWithLog<string>('get_app_version'),
+  /** 传入 GitHub latest release 的 tag_name，返回是否有 Manager 自身更新 */
+  checkManagerUpdateFromLatest: (latestTag: string) =>
+    invokeWithLog<ManagerUpdateInfo>('check_manager_update_from_latest', { latestTag }),
   checkOpenclawInstalled: () => invokeWithLog<boolean>('check_openclaw_installed'),
   getOpenclawVersion: () => invokeWithLog<string | null>('get_openclaw_version'),
   /** 安装/更新渠道：latest | nightly */

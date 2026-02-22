@@ -38,6 +38,77 @@ pub fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Manager 自身更新信息（由前端传入 latest tag 后比较得出）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManagerUpdateInfo {
+    pub update_available: bool,
+    pub current_version: String,
+    pub latest_version: String,
+}
+
+fn extract_numeric_parts_manager(version: &str) -> Vec<u32> {
+    let mut parts = Vec::new();
+    let mut buf = String::new();
+    let version = version.trim().trim_start_matches('v');
+    for ch in version.chars() {
+        if ch.is_ascii_digit() {
+            buf.push(ch);
+        } else if !buf.is_empty() {
+            if let Ok(n) = buf.parse::<u32>() {
+                parts.push(n);
+            }
+            buf.clear();
+        }
+    }
+    if !buf.is_empty() {
+        if let Ok(n) = buf.parse::<u32>() {
+            parts.push(n);
+        }
+    }
+    parts
+}
+
+/// 比较版本号，返回 latest > current
+fn compare_versions_manager(current: &str, latest: &str) -> bool {
+    let current_parts = extract_numeric_parts_manager(current);
+    let latest_parts = extract_numeric_parts_manager(latest);
+    let max_len = current_parts.len().max(latest_parts.len());
+    for i in 0..max_len {
+        let c = current_parts.get(i).unwrap_or(&0);
+        let l = latest_parts.get(i).unwrap_or(&0);
+        if *l > *c {
+            return true;
+        } else if *l < *c {
+            return false;
+        }
+    }
+    false
+}
+
+/// 根据前端获取的 latest release tag 检查是否有 Manager 自身更新
+#[command]
+pub fn check_manager_update_from_latest(latest_tag: String) -> ManagerUpdateInfo {
+    let current = env!("CARGO_PKG_VERSION").to_string();
+    let latest = latest_tag.trim().trim_start_matches('v').to_string();
+    info!(
+        "[Manager 升级检测] 当前版本: {}, 远端 tag: {} -> latest: {}",
+        current,
+        latest_tag.trim(),
+        if latest.is_empty() { "(空)" } else { &latest }
+    );
+    let update_available = !latest.is_empty() && compare_versions_manager(&current, &latest);
+    info!(
+        "[Manager 升级检测] 是否有更新: {}, latest_version: {}",
+        update_available,
+        if latest.is_empty() { &current } else { &latest }
+    );
+    ManagerUpdateInfo {
+        update_available,
+        current_version: current.clone(),
+        latest_version: if latest.is_empty() { current } else { latest },
+    }
+}
+
 /// 获取完整配置
 #[command]
 pub async fn get_config() -> Result<Value, String> {

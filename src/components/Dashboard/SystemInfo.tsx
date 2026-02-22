@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Monitor, Folder, CheckCircle, XCircle, Smartphone } from 'lucide-react';
-import { api, SystemInfo as SystemInfoType, isTauri } from '../../lib/tauri';
+import { Monitor, Folder, CheckCircle, XCircle, Smartphone, ExternalLink } from 'lucide-react';
+import { api, SystemInfo as SystemInfoType, ManagerUpdateInfo, isTauri } from '../../lib/tauri';
+import { GITHUB_REPO, GITHUB_RELEASES_URL } from '../../lib/appConfig';
 
 interface SystemInfoProps {
   refreshToken?: string;
@@ -9,6 +10,7 @@ interface SystemInfoProps {
 export function SystemInfo({ refreshToken }: SystemInfoProps) {
   const [info, setInfo] = useState<SystemInfoType | null>(null);
   const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [managerUpdate, setManagerUpdate] = useState<ManagerUpdateInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,6 +27,7 @@ export function SystemInfo({ refreshToken }: SystemInfoProps) {
         ]);
         setInfo(systemInfo);
         setAppVersion(version);
+        setManagerUpdate(null);
       } catch {
         // 静默处理
       } finally {
@@ -33,6 +36,32 @@ export function SystemInfo({ refreshToken }: SystemInfoProps) {
     };
     fetchInfo();
   }, [refreshToken]);
+
+  // Manager 自身更新检测（延迟请求，不阻塞首屏）
+  useEffect(() => {
+    if (!isTauri() || !appVersion) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+          { signal: controller.signal }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const tag = data?.tag_name;
+        if (typeof tag !== 'string') return;
+        const result = await api.checkManagerUpdateFromLatest(tag);
+        setManagerUpdate(result);
+      } catch {
+        // 网络或解析失败静默忽略
+      }
+    }, 1500);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [appVersion]);
 
   const getOSLabel = (os: string) => {
     switch (os) {
@@ -85,9 +114,22 @@ export function SystemInfo({ refreshToken }: SystemInfoProps) {
             <div className="w-8 h-8 rounded-lg bg-dark-500 flex items-center justify-center">
               <Smartphone size={16} className="text-gray-400" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-500">OpenClaw Manager</p>
-              <p className="text-sm text-white">v{appVersion}</p>
+              <p className="text-sm text-white flex items-center gap-1.5 flex-wrap">
+                <span>v{appVersion}</span>
+                {managerUpdate?.update_available && (
+                  <a
+                    href={GITHUB_RELEASES_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 text-xs"
+                  >
+                    <ExternalLink size={12} />
+                    有新版本 {managerUpdate.latest_version}
+                  </a>
+                )}
+              </p>
             </div>
           </div>
         )}
