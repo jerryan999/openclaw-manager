@@ -239,12 +239,12 @@ endif
 
 xattr: ## (macOS) Remove quarantine attribute from .app and .dmg so Gatekeeper won't show 'damaged'
 ifeq ($(DETECTED_OS),macOS)
-	@echo "Removing quarantine (xattr -cr) from bundle..."
+	@echo "Removing quarantine (xattr -c) from bundle..."
 	@for app in src-tauri/target/release/bundle/macos/*.app; do \
-		if [ -d "$$app" ]; then xattr -cr "$$app" && echo "  $$app"; fi; \
+		if [ -d "$$app" ]; then xattr -c "$$app" && echo "  $$app"; fi; \
 	done
 	@for dmg in src-tauri/target/release/bundle/dmg/*.dmg; do \
-		if [ -f "$$dmg" ]; then xattr -cr "$$dmg" && echo "  $$dmg"; fi; \
+		if [ -f "$$dmg" ]; then xattr -c "$$dmg" && echo "  $$dmg"; fi; \
 	done
 	@echo "Done. You can open the app or DMG without 'damaged' prompt."
 else

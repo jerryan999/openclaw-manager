@@ -18,9 +18,9 @@
     },
     {
       "id": "save-token",
-      "title": "节约成本 / 省 Token",
-      "description": "在保证效果的前提下，减少 API 调用与上下文长度，涉及模型选择与用法建议。",
-      "prompt": "请以「节约 Token、控制成本」为目标，给出一套 OpenClaw 使用建议：\n1. 系统提示词如何写得简短但有效；\n2. 对话时如何避免重复发送过长上下文；\n3. 模型选择与 max_tokens 设置建议；\n4. 是否有摘要、分步等技巧可以少用 Token。",
+      "title": "节约成本/省Token",
+      "description": "在保证效果的前提下，减少 API 调用与上下文长度",
+      "prompt": "我准备使用qmd来节约token使用，请参考文章https://docs.openclaw.ai/concepts/memory#qmd-backend-experimental， 并帮我配置一下。",
       "icon": "coins",
       "tags": ["成本", "模型"]
     }
