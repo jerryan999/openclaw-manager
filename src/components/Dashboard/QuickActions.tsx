@@ -1,4 +1,4 @@
-import { Play, Square, RotateCcw, Stethoscope } from 'lucide-react';
+import { Play, Square, RotateCcw } from 'lucide-react';
 import clsx from 'clsx';
 
 interface ServiceStatus {
@@ -28,7 +28,7 @@ export function QuickActions({
     <div className="bg-dark-700 rounded-2xl p-6 border border-dark-500">
       <h3 className="text-lg font-semibold text-white mb-4">快捷操作</h3>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {/* 启动按钮 */}
         <button
           onClick={onStart}
@@ -112,21 +112,6 @@ export function QuickActions({
             />
           </div>
           <span className="text-sm font-medium text-gray-300">重启</span>
-        </button>
-
-        {/* 诊断按钮 */}
-        <button
-          disabled={loading}
-          className={clsx(
-            'flex flex-col items-center gap-3 p-4 rounded-xl transition-all',
-            'border border-dark-500',
-            'bg-dark-600 hover:bg-purple-500/20 hover:border-purple-500/50'
-          )}
-        >
-          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-500/20">
-            <Stethoscope size={20} className="text-purple-400" />
-          </div>
-          <span className="text-sm font-medium text-gray-300">诊断</span>
         </button>
       </div>
     </div>

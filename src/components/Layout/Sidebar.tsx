@@ -92,19 +92,12 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
           type="button"
           onClick={() => onNavigate('learning')}
           className={clsx(
-            'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all relative',
+            'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all',
             currentPage === 'learning'
               ? 'text-white bg-claw-500/20 border border-claw-500/40'
               : 'border border-dark-500 bg-dark-600 hover:bg-dark-500 text-gray-300 hover:text-white'
           )}
         >
-          {currentPage === 'learning' && (
-            <motion.div
-              layoutId="activeIndicatorBottom"
-              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-claw-500 rounded-r-full"
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            />
-          )}
           <BookOpen size={18} />
           <span>学习天地</span>
         </button>
