@@ -1,13 +1,10 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { invoke } from '@tauri-apps/api/core';
 import { StatusCard } from './StatusCard';
 import { QuickActions } from './QuickActions';
 import { SystemInfo } from './SystemInfo';
 import { Setup } from '../Setup';
 import { api, ServiceStatus, isTauri } from '../../lib/tauri';
-import { Terminal, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
-import clsx from 'clsx';
 import { EnvironmentStatus } from '../../App';
 
 interface DashboardProps {
@@ -19,11 +16,6 @@ export function Dashboard({ envStatus, onSetupComplete }: DashboardProps) {
   const [status, setStatus] = useState<ServiceStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [logsError, setLogsError] = useState<string | null>(null);
-  const [logsExpanded, setLogsExpanded] = useState(true);
-  const [autoRefreshLogs, setAutoRefreshLogs] = useState(true);
-  const logsEndRef = useRef<HTMLDivElement>(null);
 
   const fetchStatus = async () => {
     if (!isTauri()) {
@@ -40,40 +32,12 @@ export function Dashboard({ envStatus, onSetupComplete }: DashboardProps) {
     }
   };
 
-  const fetchLogs = async () => {
-    if (!isTauri()) return;
-    try {
-      setLogsError(null);
-      const result = await invoke<string[]>('get_logs', { lines: 50 });
-      const lines = Array.isArray(result) ? result : (result != null ? [String(result)] : []);
-      setLogs(lines);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setLogsError(msg || '获取日志失败');
-      setLogs([]);
-    }
-  };
-
   useEffect(() => {
     fetchStatus();
-    fetchLogs();
     if (!isTauri()) return;
-    
     const statusInterval = setInterval(fetchStatus, 3000);
-    const logsInterval = autoRefreshLogs ? setInterval(fetchLogs, 2000) : null;
-    
-    return () => {
-      clearInterval(statusInterval);
-      if (logsInterval) clearInterval(logsInterval);
-    };
-  }, [autoRefreshLogs]);
-
-  // 自动滚动到日志底部
-  useEffect(() => {
-    if (logsExpanded && logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logs, logsExpanded]);
+    return () => clearInterval(statusInterval);
+  }, []);
 
   const handleStart = async () => {
     if (!isTauri()) return;
@@ -81,7 +45,6 @@ export function Dashboard({ envStatus, onSetupComplete }: DashboardProps) {
     try {
       await api.startService();
       await fetchStatus();
-      await fetchLogs();
     } catch (e) {
       console.error('启动失败:', e);
     } finally {
@@ -95,7 +58,6 @@ export function Dashboard({ envStatus, onSetupComplete }: DashboardProps) {
     try {
       await api.stopService();
       await fetchStatus();
-      await fetchLogs();
     } catch (e) {
       console.error('停止失败:', e);
     } finally {
@@ -109,25 +71,11 @@ export function Dashboard({ envStatus, onSetupComplete }: DashboardProps) {
     try {
       await api.restartService();
       await fetchStatus();
-      await fetchLogs();
     } catch (e) {
       console.error('重启失败:', e);
     } finally {
       setActionLoading(false);
     }
-  };
-
-  const getLogLineClass = (line: string) => {
-    if (line.includes('error') || line.includes('Error') || line.includes('ERROR')) {
-      return 'text-red-400';
-    }
-    if (line.includes('warn') || line.includes('Warn') || line.includes('WARN')) {
-      return 'text-yellow-400';
-    }
-    if (line.includes('info') || line.includes('Info') || line.includes('INFO')) {
-      return 'text-green-400';
-    }
-    return 'text-gray-400';
   };
 
   const containerVariants = {
@@ -178,86 +126,6 @@ export function Dashboard({ envStatus, onSetupComplete }: DashboardProps) {
             onStop={handleStop}
             onRestart={handleRestart}
           />
-        </motion.div>
-
-        {/* 实时日志 */}
-        <motion.div variants={itemVariants}>
-          <div className="bg-dark-700 rounded-2xl border border-dark-500 overflow-hidden">
-            {/* 日志标题栏 */}
-            <div 
-              className="flex items-center justify-between px-4 py-3 bg-dark-600/50 cursor-pointer"
-              onClick={() => setLogsExpanded(!logsExpanded)}
-            >
-              <div className="flex items-center gap-2">
-                <Terminal size={16} className="text-gray-500" />
-                <span className="text-sm font-medium text-white">实时日志</span>
-                <span className="text-xs text-gray-500">
-                  ({logs.length} 行)
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                {logsExpanded && (
-                  <>
-                    <label 
-                      className="flex items-center gap-2 text-xs text-gray-400"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={autoRefreshLogs}
-                        onChange={(e) => setAutoRefreshLogs(e.target.checked)}
-                        className="w-3 h-3 rounded border-dark-500 bg-dark-600 text-claw-500"
-                      />
-                      自动刷新
-                    </label>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        fetchLogs();
-                      }}
-                      className="text-gray-500 hover:text-white"
-                      title="刷新日志"
-                    >
-                      <RefreshCw size={14} />
-                    </button>
-                  </>
-                )}
-                {logsExpanded ? (
-                  <ChevronUp size={16} className="text-gray-500" />
-                ) : (
-                  <ChevronDown size={16} className="text-gray-500" />
-                )}
-              </div>
-            </div>
-
-            {/* 日志内容 */}
-            {logsExpanded && (
-              <div className="h-64 overflow-y-auto p-4 font-mono text-xs leading-relaxed bg-dark-800">
-                {logsError ? (
-                  <div className="h-full flex flex-col items-center justify-center text-red-400 gap-1">
-                    <p>获取日志失败</p>
-                    <p className="text-gray-500 text-center max-w-full truncate" title={logsError}>{logsError}</p>
-                  </div>
-                ) : logs.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-gray-500">
-                    <p>暂无日志，请先启动服务</p>
-                  </div>
-                ) : (
-                  <>
-                    {logs.map((line, index) => (
-                      <div
-                        key={index}
-                        className={clsx('py-0.5 whitespace-pre-wrap break-all', getLogLineClass(line))}
-                      >
-                        {line}
-                      </div>
-                    ))}
-                    <div ref={logsEndRef} />
-                  </>
-                )}
-              </div>
-            )}
-          </div>
         </motion.div>
 
         {/* 系统信息 */}

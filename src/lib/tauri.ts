@@ -159,7 +159,6 @@ export const api = {
   startService: () => invokeWithLog<string>('start_service'),
   stopService: () => invokeWithLog<string>('stop_service'),
   restartService: () => invokeWithLog<string>('restart_service'),
-  getLogs: (lines?: number) => invokeWithLog<string[]>('get_logs', { lines }),
 
   // 系统信息
   getSystemInfo: () => invokeWithLog<SystemInfo>('get_system_info'),

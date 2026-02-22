@@ -1,10 +1,6 @@
 use crate::models::ServiceStatus;
-use crate::utils::platform;
 use crate::utils::shell;
 use log::{debug, info};
-use std::fs::File;
-use std::io::BufRead;
-use std::io::BufReader;
 use std::process::Command;
 use tauri::command;
 
@@ -261,37 +257,5 @@ pub async fn restart_service() -> Result<String, String> {
         let _ = stop_service().await;
         std::thread::sleep(std::time::Duration::from_secs(1));
         start_service().await
-    }
-}
-
-/// 获取日志：优先用 openclaw logs，失败则直接读取日志文件最后 N 行
-#[command]
-pub async fn get_logs(lines: Option<u32>) -> Result<Vec<String>, String> {
-    let n = lines.unwrap_or(100);
-
-    match shell::run_openclaw(&["logs", "--lines", &n.to_string()]) {
-        Ok(output) => {
-            let vec: Vec<String> = output.lines().map(|s| s.to_string()).collect();
-            if vec.is_empty() && !output.trim().is_empty() {
-                // 可能整段输出无换行，作为单行返回
-                Ok(vec![output.trim().to_string()])
-            } else {
-                Ok(vec)
-            }
-        }
-        Err(_) => {
-            // 回退：直接读取 ~/.openclaw/openclaw-gateway.log 或 /tmp/openclaw-gateway.log
-            let path = platform::get_log_file_path();
-            let file = File::open(&path).map_err(|e| {
-                format!("无法打开日志文件 {}: {}", path, e)
-            })?;
-            let reader = BufReader::new(file);
-            let all: Vec<String> = reader
-                .lines()
-                .filter_map(|r| r.ok())
-                .collect();
-            let start = all.len().saturating_sub(n as usize);
-            Ok(all[start..].to_vec())
-        }
     }
 }
