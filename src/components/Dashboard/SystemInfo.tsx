@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Monitor, Folder, CheckCircle, XCircle, Smartphone, ExternalLink } from 'lucide-react';
+import { Monitor, Folder, Smartphone, ExternalLink } from 'lucide-react';
 import { api, SystemInfo as SystemInfoType, ManagerUpdateInfo, isTauri } from '../../lib/tauri';
 import { GITHUB_REPO, GITHUB_RELEASES_URL } from '../../lib/appConfig';
 
@@ -137,25 +137,6 @@ export function SystemInfo({ refreshToken }: SystemInfoProps) {
             </div>
           </div>
         )}
-
-        {/* OpenClaw */}
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-dark-500 flex items-center justify-center">
-            {info?.openclaw_installed ? (
-              <CheckCircle size={16} className="text-green-400" />
-            ) : (
-              <XCircle size={16} className="text-red-400" />
-            )}
-          </div>
-          <div className="flex-1">
-            <p className="text-xs text-gray-500">OpenClaw</p>
-            <p className="text-sm text-white">
-              {info?.openclaw_installed
-                ? info.openclaw_version || '已安装'
-                : '未安装'}
-            </p>
-          </div>
-        </div>
 
         {/* 配置目录 */}
         <div className="flex items-center gap-3">

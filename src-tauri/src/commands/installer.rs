@@ -6,6 +6,14 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::command;
 
+/// 从 package.json 读取 version 字段（用于 runtime 中仅有 node_modules/openclaw 目录时的版本检测）
+fn get_openclaw_version_from_package_json(package_dir: &Path) -> Option<String> {
+    let pkg_path = package_dir.join("package.json");
+    let content = fs::read_to_string(&pkg_path).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&content).ok()?;
+    value.get("version").and_then(|v| v.as_str()).map(String::from)
+}
+
 /// 环境检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnvironmentStatus {
@@ -100,11 +108,21 @@ pub async fn check_environment(app: tauri::AppHandle) -> Result<EnvironmentStatu
         );
 
         // Windows 上安装状态仅认 OpenClawManager runtime，避免系统 openclaw 误判为已安装
-        (
-            runtime_path.is_some(),
-            runtime_version,
-            runtime_path,
-        )
+        // 若未找到可执行文件，再检查 runtime 下是否存在 node_modules/openclaw 包目录（部分安装方式只留下包目录）
+        let (installed, version, path) = if runtime_path.is_some() {
+            (true, runtime_version, runtime_path)
+        } else if let Some(pkg_dir) = get_windows_runtime_openclaw_package_dir() {
+            let version = get_openclaw_version_from_package_json(&pkg_dir)
+                .or_else(|| Some("已安装".to_string()));
+            info!(
+                "[环境检查] OpenClaw(Windows): 通过 node_modules/openclaw 目录检测到已安装, version={:?}",
+                version
+            );
+            (true, version, None)
+        } else {
+            (false, None, None)
+        };
+        (installed, version, path)
     } else {
         let version = get_openclaw_version();
         let installed = version.is_some();
@@ -588,6 +606,20 @@ fn get_windows_runtime_openclaw_path() -> Option<String> {
         if candidate.exists() {
             return Some(candidate.display().to_string());
         }
+    }
+    None
+}
+
+/// runtime 下 openclaw 包目录（npm-global/node_modules/openclaw），用于仅存在包目录而无可执行文件时的检测
+fn get_windows_runtime_openclaw_package_dir() -> Option<PathBuf> {
+    let rt = get_windows_runtime_root_path();
+    let pkg_dir = rt.join("npm-global").join("node_modules").join("openclaw");
+    if pkg_dir.is_dir() {
+        return Some(pkg_dir);
+    }
+    let pkg_dir_node = rt.join("node").join("node_modules").join("openclaw");
+    if pkg_dir_node.is_dir() {
+        return Some(pkg_dir_node);
     }
     None
 }
