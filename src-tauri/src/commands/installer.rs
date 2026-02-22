@@ -1,7 +1,8 @@
 use crate::utils::{platform, shell, bundled};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::command;
 
@@ -493,6 +494,75 @@ fn get_windows_runtime_root_path() -> PathBuf {
     PathBuf::from("C:\\OpenClawManager\\runtime")
 }
 
+/// 在 Windows 上为 OpenClaw 的 exec 模块打补丁：使 spawn .cmd/.bat 时使用 shell，
+/// 避免 Node 18.20.2+ 因 CVE-2024-27980 导致 spawn EINVAL（如 plugins install 时 npm pack 失败）。
+/// 安装或升级 OpenClaw 后调用，保证每次升级后补丁仍生效。
+#[cfg(windows)]
+fn apply_openclaw_windows_spawn_patch(runtime_prefix: &Path) {
+    let openclaw_dist = runtime_prefix
+        .join("node_modules")
+        .join("openclaw")
+        .join("dist");
+    if !openclaw_dist.is_dir() {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(&openclaw_dist) else {
+        return;
+    };
+    let exec_files: Vec<_> = entries
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| {
+            p.extension().map_or(false, |e| e == "js")
+                && p
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .map_or(false, |s| s.starts_with("exec"))
+        })
+        .collect();
+    for path in exec_files {
+        let Ok(mut content) = fs::read_to_string(&path) else {
+            continue;
+        };
+        // 已打过补丁则跳过
+        if content.contains("CVE-2024-27980") {
+            continue;
+        }
+        // 替换未打补丁的 shouldSpawnWithShell：return false; } 后接 async function runExec
+        const ORIG1: &str = "\treturn false;\n}\nasync function runExec";
+        const FIXED1: &str = "\t// On Windows, Node 18.20.2+ rejects spawning .cmd/.bat without shell (CVE-2024-27980 → EINVAL)\n\tif (params.platform === \"win32\") {\n\t\tconst c = (params.resolvedCommand || \"\").toLowerCase();\n\t\tif (c.endsWith(\".cmd\") || c.endsWith(\".bat\")) return true;\n\t}\n\treturn false;\n}\nasync function runExec";
+        if content.contains(ORIG1) {
+            content = content.replace(ORIG1, FIXED1);
+            if let Err(e) = fs::write(&path, content) {
+                warn!(
+                    "[OpenClaw 补丁] 写入 {} 失败: {}",
+                    path.display(),
+                    e
+                );
+            } else {
+                info!("[OpenClaw 补丁] 已应用 Windows spawn 补丁: {}", path.display());
+            }
+            return;
+        }
+        // 兼容压缩/不同格式：return false;}async function runExec
+        const ORIG2: &str = "return false;}async function runExec";
+        const FIXED2: &str = "// On Windows, Node 18.20.2+ rejects spawning .cmd/.bat without shell (CVE-2024-27980)\n\tif (params.platform === \"win32\") {\n\t\tconst c = (params.resolvedCommand || \"\").toLowerCase();\n\t\tif (c.endsWith(\".cmd\") || c.endsWith(\".bat\")) return true;\n\t}\n\treturn false;}async function runExec";
+        if content.contains(ORIG2) {
+            content = content.replace(ORIG2, FIXED2);
+            if let Err(e) = fs::write(&path, content) {
+                warn!(
+                    "[OpenClaw 补丁] 写入 {} 失败: {}",
+                    path.display(),
+                    e
+                );
+            } else {
+                info!("[OpenClaw 补丁] 已应用 Windows spawn 补丁: {}", path.display());
+            }
+            return;
+        }
+    }
+}
+
 fn get_windows_runtime_openclaw_candidates() -> Vec<PathBuf> {
     let rt = get_windows_runtime_root_path();
     let npm_global = rt.join("npm-global");
@@ -835,6 +905,7 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
             ) {
                 Ok(_) => {
                     if runtime.openclaw_cmd.exists() || runtime_openclaw_cmd_bin.exists() {
+                        apply_openclaw_windows_spawn_patch(runtime.npm_prefix.as_path());
                         return Ok(InstallResult {
                             success: true,
                             message: "OpenClaw 离线安装成功！".to_string(),
@@ -1002,6 +1073,7 @@ if ((Test-Path $runtimeOpenClawCmd) -or (Test-Path $runtimeOpenClawCmdBin)) {{
             if runtime_openclaw_cmd.exists()
                 || runtime_openclaw_cmd_bin.exists()
             {
+                apply_openclaw_windows_spawn_patch(&runtime_prefix);
                 Ok(InstallResult {
                     success: true,
                     message: format!(
@@ -2326,6 +2398,7 @@ async fn update_openclaw_windows() -> Result<InstallResult, String> {
     ) {
         Ok(output) => {
             info!("[更新OpenClaw] npm 输出: {}", output);
+            apply_openclaw_windows_spawn_patch(&runtime_prefix);
 
             // 获取新版本
             let new_version = get_windows_runtime_openclaw_version(
