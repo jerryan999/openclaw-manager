@@ -110,6 +110,12 @@ jobs:
         if: matrix.name == 'macos'
         run: npm run tauri build
 
+      - name: Remove quarantine from macOS bundle (xattr)
+        if: matrix.name == 'macos'
+        run: |
+          xattr -cr src-tauri/target/release/bundle/macos/*.app 2>/dev/null || true
+          xattr -cr src-tauri/target/release/bundle/dmg/*.dmg 2>/dev/null || true
+
       - name: Build Tauri app (Windows, NSIS only)
         if: matrix.name == 'windows'
         run: npm run tauri build -- --bundles nsis

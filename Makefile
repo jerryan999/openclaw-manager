@@ -2,7 +2,7 @@
 # Build fully offline Tauri application
 # Supports: macOS & Windows
 
-.PHONY: help build dev clean check resources install test release
+.PHONY: help build dev clean check resources install test release xattr
 
 .DEFAULT_GOAL := help
 
@@ -48,6 +48,9 @@ help: ## Show help
 	@echo "  dev         Run in development mode (uses src-tauri/resources if present = offline behavior)"
 	@echo "  build       Build offline version (release bundle)"
 	@echo "  release     Build and prepare release"
+ifeq ($(DETECTED_OS),macOS)
+	@echo "  xattr       Remove quarantine so app can open without 'damaged' prompt"
+endif
 	@echo "  clean       Clean build artifacts"
 	@echo "  info        Show project info"
 	@echo ""
@@ -195,7 +198,7 @@ endif
 info: ## Show project info
 	@echo ""
 	@echo "Project: OpenClaw Manager"
-	@echo "Version: 0.0.30"
+	@echo "Version: 0.0.31"
 	@echo "Platform: $(DETECTED_OS)"
 	@echo ""
 	@echo "Resource Status:"
@@ -232,6 +235,20 @@ ifeq ($(DETECTED_OS),Windows)
 	@if exist "src-tauri\target\release\bundle" ($(OPEN) "src-tauri\target\release\bundle") else (echo Bundle directory not found)
 else
 	@test -d "src-tauri/target/release/bundle" && $(OPEN) "src-tauri/target/release/bundle" || echo "Bundle directory not found"
+endif
+
+xattr: ## (macOS) Remove quarantine attribute from .app and .dmg so Gatekeeper won't show 'damaged'
+ifeq ($(DETECTED_OS),macOS)
+	@echo "Removing quarantine (xattr -cr) from bundle..."
+	@for app in src-tauri/target/release/bundle/macos/*.app; do \
+		if [ -d "$$app" ]; then xattr -cr "$$app" && echo "  $$app"; fi; \
+	done
+	@for dmg in src-tauri/target/release/bundle/dmg/*.dmg; do \
+		if [ -f "$$dmg" ]; then xattr -cr "$$dmg" && echo "  $$dmg"; fi; \
+	done
+	@echo "Done. You can open the app or DMG without 'damaged' prompt."
+else
+	@echo "xattr target is for macOS only (current: $(DETECTED_OS))."
 endif
 
 release: build ## Build and prepare release

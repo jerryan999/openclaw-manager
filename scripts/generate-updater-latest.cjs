@@ -46,14 +46,17 @@ const platforms = {};
 let hasAny = false;
 
 // macOS: .app.tar.gz + .app.tar.gz.sig（可能在 macos/ 或 dmg 同级）
+// CI 的 macos-latest 为 Apple Silicon，产出 arm64；Intel 为 darwin-x86_64。客户端按当前系统选对应 key 下载。
 const macTarGz = findFiles(macDir, /\.tar\.gz$/).find((f) => !f.endsWith('.sig'));
 const macSig = macTarGz ? findFiles(macDir, /\.tar\.gz\.sig$/)[0] : null;
 if (macTarGz && macSig) {
   const name = path.basename(macTarGz);
-  platforms['darwin-x86_64'] = {
+  const macEntry = {
     url: `${baseUrl}/${encodeURIComponent(name)}`,
     signature: readSig(macSig),
   };
+  // 当前 CI 仅构建一种 macOS 架构（arm64），同时写入 aarch64；若日后有 x64 或 universal 再扩展
+  platforms['darwin-aarch64'] = macEntry;
   hasAny = true;
 }
 

@@ -6,6 +6,7 @@
 
 - 应用启动后约 3.5 秒会检查是否有新版本（请求 `latest.json`）。
 - 若有新版本，顶部会显示**橙色横幅**「发现新版本 OpenClaw Manager x.y.z」，可点击「立即更新」下载并安装，安装完成后自动重启。
+- **按系统选包**：Tauri 会根据当前操作系统与架构（如 `darwin-aarch64` / `darwin-x86_64` / `windows-x86_64`）从 `latest.json` 的 `platforms` 里选对应条目下载，无需用户选择。
 
 ## 维护者：发布前必做
 
