@@ -2398,6 +2398,7 @@ async fn update_openclaw_windows() -> Result<InstallResult, String> {
     ) {
         Ok(output) => {
             info!("[更新OpenClaw] npm 输出: {}", output);
+            #[cfg(windows)]
             apply_openclaw_windows_spawn_patch(&runtime_prefix);
 
             // 获取新版本

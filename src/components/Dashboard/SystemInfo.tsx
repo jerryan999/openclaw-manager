@@ -49,9 +49,13 @@ export function SystemInfo({ refreshToken }: SystemInfoProps) {
         );
         if (!res.ok) return;
         const data = await res.json();
-        const tag = data?.tag_name;
-        if (typeof tag !== 'string') return;
-        const result = await api.checkManagerUpdateFromLatest(tag);
+        // 只以 latest release 的版本为准，不用 tag 的版本：优先 release.name，否则用 tag_name
+        const version =
+          typeof data?.name === 'string' && data.name.trim() !== ''
+            ? data.name.trim()
+            : data?.tag_name;
+        if (typeof version !== 'string') return;
+        const result = await api.checkManagerUpdateFromLatest(version);
         setManagerUpdate(result);
       } catch {
         // 网络或解析失败静默忽略
