@@ -11,15 +11,15 @@
     {
       "id": "download-skill-prompt",
       "title": "安装技能",
-      "description": "Clawhub 有上万个技能，在 https://clawhub.ai/skills 可浏览、搜索。\n\n用法：在页面选好要装的技能，把技能名填进下面提示词里再发送即可，其余可按需改。\n\n把其中的技能名改成你在 Clawhub 选中的那个（仅技能名，不包含 owner）。",
-      "prompt": "请帮助我安装这个技能，执行命令：clawhub install weather",
+      "description": "安装前可跳转到 <a href=\"https://clawhub.ai/skills\">官方技能库</a> 浏览、搜索并挑选技能。\n\n选好后，把下方提示词里的技能名改成你选中的那个，发送即可。",
+      "prompt": "请帮助我安装这个技能，执行命令：clawhub install 需要替换的技能名",
       "icon": "download",
       "tags": ["技能"]
     },
     {
       "id": "save-token",
       "title": "节约成本/省Token",
-      "description": "在保证效果的前提下，减少 API 调用与上下文长度",
+      "description": "在保证效果的前提下，减少 API 调用与上下文长度。可参考 <a href=\"https://docs.openclaw.ai/concepts/memory#qmd-backend-experimental\">QMD 文档</a> 配置。",
       "prompt": "我准备使用qmd来节约token使用，请参考文章https://docs.openclaw.ai/concepts/memory#qmd-backend-experimental， 并帮我配置一下。",
       "icon": "coins",
       "tags": ["成本", "模型"]

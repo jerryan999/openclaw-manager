@@ -1,8 +1,26 @@
 import { useState, useEffect, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { motion } from 'framer-motion';
 import { Copy, Check, Download, Coins, MessageSquare, Loader2, Search } from 'lucide-react';
 import clsx from 'clsx';
 import { LEARNING_CASES_URL } from '../../lib/appConfig';
+
+/** description 支持 HTML（如 <a>、<br/>），白名单 sanitize 后渲染，避免 XSS */
+function sanitizeDescription(html: string): string {
+  const withBr = html.replace(/\n/g, '<br/>');
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.tagName === 'A') {
+      node.setAttribute('target', '_blank');
+      node.setAttribute('rel', 'noopener noreferrer');
+    }
+  });
+  const out = DOMPurify.sanitize(withBr, {
+    ALLOWED_TAGS: ['a', 'br', 'strong', 'em', 'b', 'i'],
+    ALLOWED_ATTR: ['href'],
+  });
+  DOMPurify.removeHook('afterSanitizeAttributes');
+  return out;
+}
 
 export interface LearningCase {
   id: string;
@@ -113,7 +131,10 @@ function LearningCard({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-semibold text-white mb-1">{item.title}</h3>
-            <p className="text-sm text-gray-400 mb-2 whitespace-pre-line">{item.description}</p>
+            <div
+              className="text-sm text-gray-400 mb-2 whitespace-pre-line [&_a]:text-claw-400 [&_a:hover]:text-claw-300 [&_a]:underline [&_a]:break-all"
+              dangerouslySetInnerHTML={{ __html: sanitizeDescription(item.description) }}
+            />
             {item.tags && item.tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-3">
                 {item.tags.map((tag) => (
