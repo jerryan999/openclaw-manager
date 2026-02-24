@@ -1277,7 +1277,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
 pub const DEFAULT_GATEWAY_TOKEN: &str = "openclaw-manager-local-token";
 
 /// 国内 npm 镜像，用于 plugins install 等场景加速、减少超时
-const NPM_REGISTRY_MIRROR: &str = "https://registry.npmmirror.com";
+pub const NPM_REGISTRY_MIRROR: &str = "https://registry.npmmirror.com";
 
 /// 从 ~/.openclaw/env 文件读取所有环境变量
 /// 与 shell 脚本 `source ~/.openclaw/env` 行为一致

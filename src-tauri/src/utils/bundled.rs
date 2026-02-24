@@ -133,7 +133,7 @@ pub fn get_bundled_openclaw_package(app_handle: &tauri::AppHandle) -> Option<Pat
     None
 }
 
-/// 解压 tar.gz 文件
+/// 解压 tar.gz 文件（去掉一层顶层目录，内容直接到 target_dir）
 fn extract_tar_gz(archive_path: &Path, target_dir: &Path) -> Result<(), String> {
     info!("[解压] 解压 tar.gz: {:?} -> {:?}", archive_path, target_dir);
     
@@ -156,6 +156,30 @@ fn extract_tar_gz(archive_path: &Path, target_dir: &Path) -> Result<(), String> 
         return Err(format!("解压失败: {}", stderr));
     }
     
+    info!("[解压] tar.gz 解压成功");
+    Ok(())
+}
+/// 解压 tar.gz 到目标目录，保留顶层目录（用于插件等，解压后得到一层子目录如 package 或 qqbot）
+pub fn extract_tar_gz_into_dir(archive_path: &Path, target_dir: &Path) -> Result<(), String> {
+    info!(
+        "[解压] 解压 tar.gz（保留顶层）: {:?} -> {:?}",
+        archive_path, target_dir
+    );
+    std::fs::create_dir_all(target_dir).map_err(|e| format!("创建目录失败: {}", e))?;
+    let output = std::process::Command::new("tar")
+        .args([
+            "-xzf",
+            &archive_path.to_string_lossy(),
+            "-C",
+            &target_dir.to_string_lossy(),
+        ])
+        .output()
+        .map_err(|e| format!("执行 tar 命令失败: {}", e))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        error!("[解压] tar 命令失败: {}", stderr);
+        return Err(format!("解压失败: {}", stderr));
+    }
     info!("[解压] tar.gz 解压成功");
     Ok(())
 }

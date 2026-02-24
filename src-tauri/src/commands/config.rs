@@ -2,11 +2,12 @@ use crate::models::{
     AIConfigOverview, ChannelConfig, ConfiguredModel, ConfiguredProvider, ModelConfig,
     ModelCostConfig, OfficialProvider, OpenClawConfig, ProviderConfig, SuggestedModel,
 };
-use crate::utils::{file, platform, shell};
+use crate::utils::{bundled, file, platform, shell};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use tauri::command;
 
 /// 获取 openclaw.json 配置
@@ -1486,10 +1487,10 @@ pub async fn check_qq_plugin() -> Result<QQPluginStatus, String> {
     }
 }
 
-/// 安装 QQ 插件
+/// 安装 QQ 插件：从打包的 resources/plugins/qqbot.tgz 解压到 ~/.openclaw/extensions/qqbot 并执行 npm install --prod
 #[command]
-pub async fn install_qq_plugin() -> Result<String, String> {
-    info!("[QQ插件] 开始安装 QQ 插件...");
+pub async fn install_qq_plugin(app: tauri::AppHandle) -> Result<String, String> {
+    info!("[QQ插件] 开始安装 QQ 插件（本地 qqbot.tgz）...");
 
     // 先检查是否已安装
     let status = check_qq_plugin().await?;
@@ -1501,28 +1502,90 @@ pub async fn install_qq_plugin() -> Result<String, String> {
         ));
     }
 
-    // 安装 QQ 插件：使用 @sliverp/qqbot（官方 QQ 开放平台长连接方案）
-    info!("[QQ插件] 执行 openclaw plugins install @sliverp/qqbot@latest ...");
-    match shell::run_openclaw(&["plugins", "install", "@sliverp/qqbot@latest"]) {
-        Ok(output) => {
-            info!("[QQ插件] 安装输出: {}", output);
+    let tgz_path = bundled::get_resource_path(&app, "plugins/qqbot.tgz").ok_or_else(|| {
+        "未找到打包的 QQ 插件 (resources/plugins/qqbot.tgz)，请确保构建时已包含该文件".to_string()
+    })?;
+    info!("[QQ插件] 资源路径: {}", tgz_path.display());
 
-            // 验证安装结果
-            let verify_status = check_qq_plugin().await?;
-            if verify_status.installed {
-                info!("[QQ插件] ✓ QQ 插件安装成功");
-                Ok(format!(
-                    "QQ 插件安装成功: {}",
-                    verify_status.plugin_name.unwrap_or_default()
-                ))
-            } else {
-                warn!("[QQ插件] 安装命令执行成功但插件未找到");
-                Err("安装命令执行成功但插件未找到，请检查 openclaw 版本".to_string())
-            }
+    let extensions_dir = PathBuf::from(platform::get_config_dir()).join("extensions");
+    info!("[QQ插件] extensions 目录: {}", extensions_dir.display());
+    std::fs::create_dir_all(&extensions_dir)
+        .map_err(|e| format!("创建 extensions 目录失败: {}", e))?;
+
+    // 解压到 extensions，保留顶层目录（得到 extensions/<一层目录>/）
+    info!("[QQ插件] 解压 qqbot.tgz 到 extensions ...");
+    bundled::extract_tar_gz_into_dir(&tgz_path, &extensions_dir)?;
+
+    // 解压后应只有一个顶层子目录（如 package 或 qqbot），统一为 qqbot
+    let entries: Vec<_> = std::fs::read_dir(&extensions_dir)
+        .map_err(|e| format!("读取 extensions 目录失败: {}", e))?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .collect();
+    let top_dir = match entries.as_slice() {
+        [one] => {
+            info!("[QQ插件] 解压后顶层目录: {}", one.file_name().to_string_lossy());
+            one.path()
         }
-        Err(e) => {
-            error!("[QQ插件] ✗ 安装失败: {}", e);
-            Err(format!("安装 QQ 插件失败: {}\n\n请手动执行: openclaw plugins install @sliverp/qqbot@latest", e))
+        _ => {
+            return Err(format!(
+                "解压后 extensions 下应有且仅有一个子目录，当前: {:?}",
+                entries.iter().map(|e| e.file_name()).collect::<Vec<_>>()
+            ));
         }
+    };
+    let qqbot_dir = extensions_dir.join("qqbot");
+    if top_dir.file_name().and_then(|n| n.to_str()) != Some("qqbot") {
+        info!("[QQ插件] 将目录重命名为 qqbot ...");
+        if qqbot_dir.exists() {
+            std::fs::remove_dir_all(&qqbot_dir)
+                .map_err(|e| format!("删除已有 qqbot 目录失败: {}", e))?;
+        }
+        std::fs::rename(&top_dir, &qqbot_dir)
+            .map_err(|e| format!("重命名插件目录为 qqbot 失败: {}", e))?;
+    } else {
+        info!("[QQ插件] 已是 qqbot 目录，无需重命名");
+    }
+
+    // 在 qqbot 目录下执行 npm install --prod
+    info!("[QQ插件] 在 {} 执行 npm install --prod ...", qqbot_dir.display());
+    let extended_path = shell::get_extended_path();
+    let output = std::process::Command::new(if platform::is_windows() { "npm.cmd" } else { "npm" })
+        .args(["install", "--prod"])
+        .current_dir(&qqbot_dir)
+        .env("PATH", &extended_path)
+        .env("NPM_CONFIG_REGISTRY", shell::NPM_REGISTRY_MIRROR)
+        .output()
+        .map_err(|e| format!("执行 npm 失败: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !stdout.is_empty() {
+        info!("[QQ插件] npm stdout: {}", stdout.trim());
+    }
+    if !stderr.is_empty() {
+        debug!("[QQ插件] npm stderr: {}", stderr.trim());
+    }
+    if !output.status.success() {
+        error!("[QQ插件] npm install --prod 失败: {} {}", stdout, stderr);
+        return Err(format!(
+            "npm install --prod 失败: {}\n{}",
+            stdout.trim(),
+            stderr.trim()
+        ));
+    }
+    info!("[QQ插件] npm install --prod 完成");
+
+    // 验证安装结果
+    let verify_status = check_qq_plugin().await?;
+    if verify_status.installed {
+        info!("[QQ插件] ✓ QQ 插件安装成功");
+        Ok(format!(
+            "QQ 插件安装成功: {}",
+            verify_status.plugin_name.unwrap_or_default()
+        ))
+    } else {
+        warn!("[QQ插件] 解压与 npm 完成但 openclaw plugins list 未列出 qqbot");
+        Ok("QQ 插件已解压并完成 npm install，若 openclaw 未识别请重启或检查 ~/.openclaw/extensions".to_string())
     }
 }

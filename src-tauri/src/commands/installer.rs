@@ -515,8 +515,12 @@ fn get_windows_runtime_root_path() -> PathBuf {
 /// 在 Windows 上为 OpenClaw 的 exec 模块打补丁：使 spawn .cmd/.bat 时使用 shell，
 /// 避免 Node 18.20.2+ 因 CVE-2024-27980 导致 spawn EINVAL（如 plugins install 时 npm pack 失败）。
 /// 安装或升级 OpenClaw 后调用，保证每次升级后补丁仍生效。
+/// 参见：https://openclaw-ai.org/guides/fix-openclaw-spawn-einval-windows
 #[cfg(windows)]
 fn apply_openclaw_windows_spawn_patch(runtime_prefix: &Path) {
+    // 多种 bundle 格式：未压缩、压缩、minified 函数名 (runExec -> e/t/n/r 等)
+    const PATCH_BLOCK: &str = "// On Windows, Node 18.20.2+ rejects spawning .cmd/.bat without shell (CVE-2024-27980 → EINVAL)\n\tif (params.platform === \"win32\") {\n\t\tconst c = (params.resolvedCommand || \"\").toLowerCase();\n\t\tif (c.endsWith(\".cmd\") || c.endsWith(\".bat\")) return true;\n\t}\n\treturn false";
+
     let openclaw_dist = runtime_prefix
         .join("node_modules")
         .join("openclaw")
@@ -538,46 +542,62 @@ fn apply_openclaw_windows_spawn_patch(runtime_prefix: &Path) {
                     .map_or(false, |s| s.starts_with("exec"))
         })
         .collect();
-    for path in exec_files {
-        let Ok(mut content) = fs::read_to_string(&path) else {
+
+    let mut patched_any = false;
+    for path in &exec_files {
+        let Ok(mut content) = fs::read_to_string(path) else {
             continue;
         };
-        // 已打过补丁则跳过
         if content.contains("CVE-2024-27980") {
             continue;
         }
-        // 替换未打补丁的 shouldSpawnWithShell：return false; } 后接 async function runExec
-        const ORIG1: &str = "\treturn false;\n}\nasync function runExec";
-        const FIXED1: &str = "\t// On Windows, Node 18.20.2+ rejects spawning .cmd/.bat without shell (CVE-2024-27980 → EINVAL)\n\tif (params.platform === \"win32\") {\n\t\tconst c = (params.resolvedCommand || \"\").toLowerCase();\n\t\tif (c.endsWith(\".cmd\") || c.endsWith(\".bat\")) return true;\n\t}\n\treturn false;\n}\nasync function runExec";
-        if content.contains(ORIG1) {
-            content = content.replace(ORIG1, FIXED1);
-            if let Err(e) = fs::write(&path, content) {
-                warn!(
-                    "[OpenClaw 补丁] 写入 {} 失败: {}",
-                    path.display(),
-                    e
-                );
-            } else {
-                info!("[OpenClaw 补丁] 已应用 Windows spawn 补丁: {}", path.display());
-            }
-            return;
+
+        let (orig, fixed) = if content.contains("\treturn false;\n}\nasync function runExec") {
+            (
+                "\treturn false;\n}\nasync function runExec",
+                concat!(
+                    "// On Windows, Node 18.20.2+ rejects spawning .cmd/.bat without shell (CVE-2024-27980 → EINVAL)\n\tif (params.platform === \"win32\") {\n\t\tconst c = (params.resolvedCommand || \"\").toLowerCase();\n\t\tif (c.endsWith(\".cmd\") || c.endsWith(\".bat\")) return true;\n\t}\n\treturn false",
+                    "\n}\nasync function runExec"
+                ),
+            )
+        } else if content.contains("return false;}async function runExec") {
+            (
+                "return false;}async function runExec",
+                concat!(
+                    PATCH_BLOCK,
+                    ";}async function runExec"
+                ),
+            )
+        } else if content.contains("return false;}async function e(") {
+            ( "return false;}async function e(", concat!(PATCH_BLOCK, ";}async function e(") )
+        } else if content.contains("return false;}async function t(") {
+            ( "return false;}async function t(", concat!(PATCH_BLOCK, ";}async function t(") )
+        } else if content.contains("return false;}async function n(") {
+            ( "return false;}async function n(", concat!(PATCH_BLOCK, ";}async function n(") )
+        } else if content.contains("return false;}async function r(") {
+            ( "return false;}async function r(", concat!(PATCH_BLOCK, ";}async function r(") )
+        } else {
+            continue;
+        };
+
+        content = content.replace(orig, fixed);
+        if let Err(e) = fs::write(path, content) {
+            warn!(
+                "[OpenClaw 补丁] 写入 {} 失败: {}",
+                path.display(),
+                e
+            );
+        } else {
+            info!("[OpenClaw 补丁] 已应用 Windows spawn 补丁: {}", path.display());
+            patched_any = true;
         }
-        // 兼容压缩/不同格式：return false;}async function runExec
-        const ORIG2: &str = "return false;}async function runExec";
-        const FIXED2: &str = "// On Windows, Node 18.20.2+ rejects spawning .cmd/.bat without shell (CVE-2024-27980)\n\tif (params.platform === \"win32\") {\n\t\tconst c = (params.resolvedCommand || \"\").toLowerCase();\n\t\tif (c.endsWith(\".cmd\") || c.endsWith(\".bat\")) return true;\n\t}\n\treturn false;}async function runExec";
-        if content.contains(ORIG2) {
-            content = content.replace(ORIG2, FIXED2);
-            if let Err(e) = fs::write(&path, content) {
-                warn!(
-                    "[OpenClaw 补丁] 写入 {} 失败: {}",
-                    path.display(),
-                    e
-                );
-            } else {
-                info!("[OpenClaw 补丁] 已应用 Windows spawn 补丁: {}", path.display());
-            }
-            return;
-        }
+    }
+
+    if !patched_any && !exec_files.is_empty() {
+        warn!(
+            "[OpenClaw 补丁] 未匹配到可打补丁的 exec 模块，plugins install 在 Windows 上可能仍出现 spawn EINVAL。\
+            请检查管理员/执行策略/杀毒软件，或参考 https://openclaw-ai.org/guides/fix-openclaw-spawn-einval-windows"
+        );
     }
 }
 
