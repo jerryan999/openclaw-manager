@@ -1,0 +1,18 @@
+# 自定义构建：手动触发，可填写注册链接等环境变量，仅产出 artifacts（exe/dmg 由你本地或后续手动制作）
+name: Build (Custom)
+
+on:
+  workflow_dispatch:
+    inputs:
+      register_url:
+        description: '注册页链接（可选）。不填则使用默认 https://api.duojieai.com/register?aff=EZf2'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-app.yml
+    with:
+      vite_register_url: ${{ inputs.register_url }}
+      artifact_suffix: '-custom'

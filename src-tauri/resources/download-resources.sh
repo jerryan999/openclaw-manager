@@ -91,32 +91,33 @@ esac
 cd ..
 echo ""
 
-# 下载 OpenClaw（离线安装包，不需要 Git）
-echo "📦 下载 OpenClaw（离线安装，无需 Git）..."
+# 下载 OpenClaw 最新版（离线安装包，不需要 Git）
+echo "📦 下载 OpenClaw 最新版（离线安装，无需 Git）..."
 cd openclaw
 
 if command -v npm &> /dev/null; then
-  echo "  使用 npm pack 打包（国内镜像加速）..."
-  rm -f *.tgz
-
   # 使用国内镜像加速，减少超时
   export NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}"
 
-  # 强制清除缓存并从 registry 获取最新版本
-  npm cache clean --force 2>/dev/null || true
+  OPENCLAW_LATEST=$(npm view "${OPENCLAW_PACKAGE}@latest" version 2>/dev/null || echo "unknown")
+  echo "  目标版本: ${OPENCLAW_PACKAGE}@latest (当前最新: ${OPENCLAW_LATEST})"
+  echo "  使用 npm pack 打包..."
+  rm -f *.tgz
+
+  # 强制从 registry 拉取最新版本（--prefer-online 优先网络，避免用旧缓存）
   npm pack "${OPENCLAW_PACKAGE}@latest" --prefer-online
 
   # npm pack openclaw 生成 openclaw-<version>.tgz，重命名为统一文件名
   for file in openclaw-*.tgz; do
     if [ -f "$file" ]; then
       mv "$file" openclaw.tgz
-      echo "  ✓ 已保存为: openclaw.tgz"
+      echo "  ✓ 已保存为: openclaw.tgz (openclaw@${OPENCLAW_LATEST})"
       break
     fi
   done
 else
   echo "  ⚠️  npm 未安装，跳过 OpenClaw 下载"
-  echo "  请手动运行: npm pack $OPENCLAW_PACKAGE"
+  echo "  请手动运行: npm pack ${OPENCLAW_PACKAGE}@latest"
 fi
 
 cd ..

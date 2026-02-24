@@ -1,0 +1,157 @@
+# 可复用构建：macOS + Windows 构建并上传 artifacts，由 build.yml / build-custom.yml 调用
+name: Build App (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      vite_register_url:
+        description: '可选。VITE_REGISTER_URL 的值，用于覆盖注册页链接'
+        required: false
+        type: string
+        default: ''
+      artifact_suffix:
+        description: 'artifact 名称后缀，如空或 "-custom"'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            name: macos
+          - platform: windows-latest
+            name: windows
+
+    runs-on: ${{ matrix.platform }}
+
+    env:
+      CI: "true"
+      VITE_REGISTER_URL: ${{ inputs.vite_register_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Prepare QQ plugin (qqbot.tgz)
+        run: |
+          mkdir -p src-tauri/resources/plugins
+          cd src-tauri/resources/plugins
+          npm pack @sliverp/qqbot@latest
+          mv sliverp-qqbot-*.tgz qqbot.tgz
+        shell: bash
+
+      - name: Download bundled resources (macOS/Linux)
+        if: matrix.name == 'macos'
+        run: |
+          cd src-tauri/resources
+          chmod +x download-resources.sh
+          ./download-resources.sh
+
+      - name: Download bundled resources (Windows)
+        if: matrix.name == 'windows'
+        run: |
+          cd src-tauri/resources
+          ./download-resources.ps1
+        shell: pwsh
+
+      - name: Prepare portable Git resource (Windows)
+        if: matrix.name == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/resources/git | Out-Null
+          $gitExe = (Get-Command git).Source
+          $gitRoot = Split-Path (Split-Path $gitExe -Parent) -Parent
+          Compress-Archive -Path "$gitRoot\*" -DestinationPath "src-tauri/resources/git/git-portable.zip" -Force
+
+      - name: Prepare offline OpenClaw runtime (Windows)
+        if: matrix.name == 'windows'
+        shell: pwsh
+        run: |
+          $extractDir = "src-tauri/resources/offline/node-extract"
+          if (Test-Path $extractDir) { Remove-Item -Recurse -Force $extractDir }
+          Expand-Archive -Path "src-tauri/resources/nodejs/node-windows-x64.zip" -DestinationPath $extractDir -Force
+
+          $nodeExe = Get-ChildItem -Path $extractDir -Filter node.exe -Recurse | Select-Object -First 1
+          if (-not $nodeExe) { throw "node.exe not found in bundled node zip" }
+          $nodeDir = Split-Path $nodeExe.FullName -Parent
+          $npmCmd = Join-Path $nodeDir "npm.cmd"
+          if (-not (Test-Path $npmCmd)) { throw "npm.cmd not found near node.exe" }
+
+          $offlinePrefix = "src-tauri/resources/offline/npm-global"
+          if (Test-Path $offlinePrefix) { Remove-Item -Recurse -Force $offlinePrefix }
+          New-Item -ItemType Directory -Force -Path $offlinePrefix | Out-Null
+
+          & $npmCmd install -g "src-tauri/resources/openclaw/openclaw.tgz" --prefix $offlinePrefix --no-audit --fund=false --loglevel=error
+          if ($LASTEXITCODE -ne 0) { throw "offline openclaw install failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path "$offlinePrefix/openclaw.cmd")) { throw "openclaw.cmd not found after preinstall" }
+          $pkgDir = Join-Path $offlinePrefix "node_modules\openclaw"
+          if (Test-Path $pkgDir) {
+            $env:PATH = "$nodeDir;$env:PATH"
+            Push-Location $pkgDir
+            & $npmCmd install --omit=dev --no-audit --fund=false --loglevel=error
+            if ($LASTEXITCODE -ne 0) { throw "npm install in openclaw failed with exit code $LASTEXITCODE" }
+            Pop-Location
+          }
+
+          # 预装 clawhub CLI 到 npm-global，使 spawn 的终端中可直接运行 clawhub 命令
+          $env:PATH = "$nodeDir;$offlinePrefix;$env:PATH"
+          $env:npm_config_prefix = $offlinePrefix
+          & $npmCmd install -g clawhub@latest --prefix $offlinePrefix --no-audit --fund=false --loglevel=error 2>&1
+          if ($LASTEXITCODE -ne 0) { Write-Host "Warning: npm install -g clawhub failed (optional)" }
+
+          $offlineZip = "src-tauri/resources/offline/npm-global.zip"
+          if (Test-Path $offlineZip) { Remove-Item -Force $offlineZip }
+          tar.exe -a -c -f $offlineZip -C $offlinePrefix .
+          if ($LASTEXITCODE -ne 0) { throw "failed to create offline npm-global zip" }
+          Remove-Item -Recurse -Force $offlinePrefix
+
+          Remove-Item -Recurse -Force $extractDir
+
+      - name: Build Tauri app (macOS)
+        if: matrix.name == 'macos'
+        run: npm run tauri build
+
+      - name: Remove quarantine from macOS bundle (xattr)
+        if: matrix.name == 'macos'
+        run: |
+          xattr -cr src-tauri/target/release/bundle/macos/*.app 2>/dev/null || true
+          xattr -cr src-tauri/target/release/bundle/dmg/*.dmg 2>/dev/null || true
+
+      - name: Build Tauri app (Windows, NSIS only)
+        if: matrix.name == 'windows'
+        run: npm run tauri build -- --bundles nsis
+
+      - name: Upload macOS artifacts
+        if: matrix.name == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openclaw-manager-macos${{ inputs.artifact_suffix }}
+          path: src-tauri/target/release/bundle/
+
+      - name: Upload Windows artifacts
+        if: matrix.name == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openclaw-manager-windows${{ inputs.artifact_suffix }}
+          path: src-tauri/target/release/bundle/

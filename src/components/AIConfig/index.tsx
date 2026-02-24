@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { aiLogger } from '../../lib/logger';
+import { REGISTER_URL } from '@/lib/appConfig';
 
 // ============ 类型定义 ============
 
@@ -457,7 +458,7 @@ function ProviderDialog({ recommendedProviders, officialProviders, onClose, onSa
                       <span>未注册？</span>
                       <button
                         type="button"
-                        onClick={() => open('https://api.duojieai.com/register?aff=EZf2')}
+                        onClick={() => open(REGISTER_URL)}
                         className="text-claw-400 hover:underline bg-transparent border-0 p-0 cursor-pointer"
                       >
                         前往注册

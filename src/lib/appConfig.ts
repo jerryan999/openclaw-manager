@@ -13,3 +13,8 @@ export const WECHAT_QR_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/$
 export const LEARNING_CASES_URL = import.meta.env.DEV
   ? '/learning-cases.json'
   : `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/public/learning-cases.json`;
+
+/** 多界/对接等注册页链接，构建时可通过 VITE_REGISTER_URL 覆盖，未设置时使用默认值 */
+export const REGISTER_URL =
+  (import.meta.env.VITE_REGISTER_URL as string | undefined)?.trim() ||
+  'https://api.duojieai.com/register?aff=EZf2';

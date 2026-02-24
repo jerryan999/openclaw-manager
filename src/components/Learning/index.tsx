@@ -5,21 +5,20 @@ import { Copy, Check, Download, Coins, MessageSquare, Loader2, Search } from 'lu
 import clsx from 'clsx';
 import { LEARNING_CASES_URL } from '../../lib/appConfig';
 
-/** description 支持 HTML（如 <a>、<br/>），白名单 sanitize 后渲染，避免 XSS */
+/** description 在页面上以 HTML 渲染（支持 <a>、<br/>、<strong> 等），经 DOMPurify 白名单后输出，避免 XSS */
+const DESCRIPTION_ALLOWED = {
+  ALLOWED_TAGS: ['a', 'br', 'strong', 'em', 'b', 'i'],
+  ALLOWED_ATTR: ['href'],
+};
+
 function sanitizeDescription(html: string): string {
   const withBr = html.replace(/\n/g, '<br/>');
-  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-    if (node.tagName === 'A') {
-      node.setAttribute('target', '_blank');
-      node.setAttribute('rel', 'noopener noreferrer');
-    }
-  });
   const out = DOMPurify.sanitize(withBr, {
-    ALLOWED_TAGS: ['a', 'br', 'strong', 'em', 'b', 'i'],
-    ALLOWED_ATTR: ['href'],
+    ...DESCRIPTION_ALLOWED,
+    ADD_ATTR: ['target', 'rel'],
   });
-  DOMPurify.removeHook('afterSanitizeAttributes');
-  return out;
+  // 为链接统一加上 target="_blank" 与 rel（DOMPurify 可能不保留，用后处理保证）
+  return out.replace(/<a\s+/g, '<a target="_blank" rel="noopener noreferrer" ');
 }
 
 export interface LearningCase {
