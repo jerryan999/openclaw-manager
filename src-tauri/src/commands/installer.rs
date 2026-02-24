@@ -552,35 +552,32 @@ fn apply_openclaw_windows_spawn_patch(runtime_prefix: &Path) {
             continue;
         }
 
-        let (orig, fixed) = if content.contains("\treturn false;\n}\nasync function runExec") {
+        let (orig, fixed): (&str, String) = if content.contains("\treturn false;\n}\nasync function runExec") {
             (
                 "\treturn false;\n}\nasync function runExec",
-                concat!(
-                    "// On Windows, Node 18.20.2+ rejects spawning .cmd/.bat without shell (CVE-2024-27980 → EINVAL)\n\tif (params.platform === \"win32\") {\n\t\tconst c = (params.resolvedCommand || \"\").toLowerCase();\n\t\tif (c.endsWith(\".cmd\") || c.endsWith(\".bat\")) return true;\n\t}\n\treturn false",
-                    "\n}\nasync function runExec"
+                format!(
+                    "{}\n}}\nasync function runExec",
+                    PATCH_BLOCK
                 ),
             )
         } else if content.contains("return false;}async function runExec") {
             (
                 "return false;}async function runExec",
-                concat!(
-                    PATCH_BLOCK,
-                    ";}async function runExec"
-                ),
+                format!("{}{}", PATCH_BLOCK, ";}async function runExec"),
             )
         } else if content.contains("return false;}async function e(") {
-            ( "return false;}async function e(", concat!(PATCH_BLOCK, ";}async function e(") )
+            ("return false;}async function e(", format!("{}{}", PATCH_BLOCK, ";}async function e("))
         } else if content.contains("return false;}async function t(") {
-            ( "return false;}async function t(", concat!(PATCH_BLOCK, ";}async function t(") )
+            ("return false;}async function t(", format!("{}{}", PATCH_BLOCK, ";}async function t("))
         } else if content.contains("return false;}async function n(") {
-            ( "return false;}async function n(", concat!(PATCH_BLOCK, ";}async function n(") )
+            ("return false;}async function n(", format!("{}{}", PATCH_BLOCK, ";}async function n("))
         } else if content.contains("return false;}async function r(") {
-            ( "return false;}async function r(", concat!(PATCH_BLOCK, ";}async function r(") )
+            ("return false;}async function r(", format!("{}{}", PATCH_BLOCK, ";}async function r("))
         } else {
             continue;
         };
 
-        content = content.replace(orig, fixed);
+        content = content.replace(orig, &fixed);
         if let Err(e) = fs::write(path, content) {
             warn!(
                 "[OpenClaw 补丁] 写入 {} 失败: {}",
