@@ -1180,7 +1180,8 @@ pub fn run_openclaw_with_cwd(args: &[&str], cwd: &Path) -> Result<String, String
         cmd.args(&cmd_args)
             .current_dir(cwd)
             .env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN)
-            .env("PATH", &extended_path);
+            .env("PATH", &extended_path)
+            .env("NPM_CONFIG_REGISTRY", NPM_REGISTRY_MIRROR);
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
         cmd.output()
@@ -1189,7 +1190,8 @@ pub fn run_openclaw_with_cwd(args: &[&str], cwd: &Path) -> Result<String, String
         cmd.args(args)
             .current_dir(cwd)
             .env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN)
-            .env("PATH", &extended_path);
+            .env("PATH", &extended_path)
+            .env("NPM_CONFIG_REGISTRY", NPM_REGISTRY_MIRROR);
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
         cmd.output()
@@ -1231,7 +1233,8 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
         let mut cmd = Command::new("cmd");
         cmd.args(&cmd_args)
             .env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN)
-            .env("PATH", &extended_path);
+            .env("PATH", &extended_path)
+            .env("NPM_CONFIG_REGISTRY", NPM_REGISTRY_MIRROR);
 
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
@@ -1241,7 +1244,8 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
         let mut cmd = Command::new(&openclaw_path);
         cmd.args(args)
             .env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN)
-            .env("PATH", &extended_path);
+            .env("PATH", &extended_path)
+            .env("NPM_CONFIG_REGISTRY", NPM_REGISTRY_MIRROR);
 
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
@@ -1271,6 +1275,9 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
 
 /// 默认的 Gateway Token
 pub const DEFAULT_GATEWAY_TOKEN: &str = "openclaw-manager-local-token";
+
+/// 国内 npm 镜像，用于 plugins install 等场景加速、减少超时
+const NPM_REGISTRY_MIRROR: &str = "https://registry.npmmirror.com";
 
 /// 从 ~/.openclaw/env 文件读取所有环境变量
 /// 与 shell 脚本 `source ~/.openclaw/env` 行为一致

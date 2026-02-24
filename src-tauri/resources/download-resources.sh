@@ -96,8 +96,11 @@ echo "📦 下载 OpenClaw（离线安装，无需 Git）..."
 cd openclaw
 
 if command -v npm &> /dev/null; then
-  echo "  使用 npm pack 打包..."
+  echo "  使用 npm pack 打包（国内镜像加速）..."
   rm -f *.tgz
+
+  # 使用国内镜像加速，减少超时
+  export NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}"
 
   # 强制清除缓存并从 registry 获取最新版本
   npm cache clean --force 2>/dev/null || true
