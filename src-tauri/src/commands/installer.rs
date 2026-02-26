@@ -925,11 +925,9 @@ async fn install_openclaw_windows(app: &tauri::AppHandle) -> Result<InstallResul
     // 优先使用 Windows 离线运行时（打包的 Node + OpenClaw 包）
     if let Ok(runtime) = shell::get_windows_offline_runtime() {
         if runtime.openclaw_cmd.exists() {
-            return Ok(InstallResult {
-                success: true,
-                message: "OpenClaw 离线运行时已就绪。".to_string(),
-                error: None,
-            });
+            info!(
+                "[安装OpenClaw] 检测到 runtime 已存在 openclaw.cmd，继续执行离线包安装以确保版本为最新打包资源"
+            );
         }
 
         let npm_cmd = runtime.node_dir.join("npm.cmd");

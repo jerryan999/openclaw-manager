@@ -61,6 +61,12 @@ jobs:
           mv sliverp-qqbot-*.tgz qqbot.tgz
         shell: bash
 
+      - name: Clean bundled OpenClaw cache
+        run: |
+          rm -f src-tauri/resources/openclaw/openclaw.tgz
+          rm -f src-tauri/resources/offline/npm-global.zip
+        shell: bash
+
       - name: Download bundled resources (macOS/Linux)
         if: matrix.name == 'macos'
         run: |
@@ -120,6 +126,16 @@ jobs:
           Remove-Item -Recurse -Force $offlinePrefix
 
           Remove-Item -Recurse -Force $extractDir
+
+      - name: Verify bundled OpenClaw version (Windows)
+        if: matrix.name == 'windows'
+        shell: pwsh
+        run: |
+          $pkg = "src-tauri/resources/openclaw/openclaw.tgz"
+          if (-not (Test-Path $pkg)) { throw "openclaw.tgz not found: $pkg" }
+          $tmp = Join-Path $env:RUNNER_TEMP "openclaw-package.json"
+          tar.exe -xOf $pkg package/package.json > $tmp
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));console.log('bundled openclaw version='+p.version)" $tmp
 
       - name: Build Tauri app (macOS)
         if: matrix.name == 'macos'

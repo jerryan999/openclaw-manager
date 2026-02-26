@@ -431,16 +431,13 @@ fn ensure_windows_openclaw_package(runtime_root: &Path) -> io::Result<PathBuf> {
     ensure_dir_all_replace_conflicts(&packages_dir)?;
 
     let target = packages_dir.join("openclaw.tgz");
-    if target.exists() {
-        return Ok(target);
-    }
-
     let source = find_windows_resource_file(OPENCLAW_RESOURCE_RELATIVE_PATH).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
             "找不到内置 OpenClaw 资源: resources/openclaw/openclaw.tgz",
         )
     })?;
+    // 每次都同步最新打包资源，避免 runtime 持有历史版本 openclaw.tgz。
     fs::copy(source, &target)?;
     Ok(target)
 }
