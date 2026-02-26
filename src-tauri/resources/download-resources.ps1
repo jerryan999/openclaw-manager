@@ -5,6 +5,7 @@ $ErrorActionPreference = "Stop"
 
 $NODE_VERSION = "22.12.0"
 $OPENCLAW_PACKAGE = "openclaw"
+$QQBOT_PACKAGE = "@sliverp/qqbot"
 
 Write-Host "=========================================="
 Write-Host "  下载打包资源"
@@ -14,6 +15,7 @@ Write-Host ""
 # 创建目录
 New-Item -ItemType Directory -Force -Path "nodejs" | Out-Null
 New-Item -ItemType Directory -Force -Path "openclaw" | Out-Null
+New-Item -ItemType Directory -Force -Path "plugins" | Out-Null
 New-Item -ItemType Directory -Force -Path "git" | Out-Null
 
 # 下载 Node.js for Windows
@@ -90,6 +92,31 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
 Set-Location ".."
 Write-Host ""
 
+# 下载 QQ 插件（离线安装包）
+Write-Host "📦 下载 QQ 插件（离线安装包）..."
+Set-Location "plugins"
+
+if (Get-Command npm -ErrorAction SilentlyContinue) {
+    Write-Host "  使用 npm pack 打包..."
+    Remove-Item "*.tgz" -ErrorAction SilentlyContinue
+    npm cache verify
+    npm pack "$($QQBOT_PACKAGE)@latest" --prefer-online
+
+    # npm pack @sliverp/qqbot 生成 sliverp-qqbot-<version>.tgz，重命名为统一文件名
+    $tgzFiles = Get-ChildItem "sliverp-qqbot-*.tgz"
+    if ($tgzFiles.Count -gt 0) {
+        $tgzFile = $tgzFiles[0]
+        Move-Item -Path $tgzFile.Name -Destination "qqbot.tgz" -Force
+        Write-Host "  ✓ 已保存为: qqbot.tgz"
+    }
+} else {
+    Write-Host "  ⚠️  npm 未安装，跳过 QQ 插件下载"
+    Write-Host "  请手动运行: npm pack $QQBOT_PACKAGE"
+}
+
+Set-Location ".."
+Write-Host ""
+
 # 显示下载的文件
 Write-Host "=========================================="
 Write-Host "  已下载的资源："
@@ -102,6 +129,11 @@ Get-ChildItem "nodejs" -ErrorAction SilentlyContinue | ForEach-Object {
 Write-Host ""
 Write-Host "OpenClaw:"
 Get-ChildItem "openclaw" -ErrorAction SilentlyContinue | ForEach-Object {
+    $mb = [math]::Round($_.Length / 1MB, 2); Write-Host ("  " + $_.Name + " - " + $mb + " MB")
+}
+Write-Host ""
+Write-Host "QQ 插件:"
+Get-ChildItem "plugins" -ErrorAction SilentlyContinue | ForEach-Object {
     $mb = [math]::Round($_.Length / 1MB, 2); Write-Host ("  " + $_.Name + " - " + $mb + " MB")
 }
 Write-Host ""

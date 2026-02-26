@@ -9,12 +9,19 @@ use tauri::Manager;
 pub fn get_resource_path(app_handle: &tauri::AppHandle, resource_name: &str) -> Option<PathBuf> {
     if let Ok(resource_path) = app_handle.path().resource_dir() {
         debug!("[资源] 资源根目录: {:?}", resource_path);
-        let full_path = resource_path.join(resource_name);
-        if full_path.exists() {
-            info!("[资源] ✓ 找到打包资源: {:?}", full_path);
-            return Some(full_path);
+        // 兼容两种常见打包布局：
+        // 1) <resource_dir>/<resource_name>
+        // 2) <resource_dir>/resources/<resource_name>
+        for candidate in [
+            resource_path.join(resource_name),
+            resource_path.join("resources").join(resource_name),
+        ] {
+            if candidate.exists() {
+                info!("[资源] ✓ 找到打包资源: {:?}", candidate);
+                return Some(candidate);
+            }
+            debug!("[资源] 检查路径: {:?}, exists=false", candidate);
         }
-        debug!("[资源] 检查路径: {:?}, exists=false", full_path);
         if let Ok(entries) = std::fs::read_dir(&resource_path) {
             debug!("[资源] 资源目录内容:");
             for entry in entries.flatten() {

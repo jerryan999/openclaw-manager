@@ -6,6 +6,7 @@ set -e
 
 NODE_VERSION="22.12.0"
 OPENCLAW_PACKAGE="openclaw"
+QQBOT_PACKAGE="@sliverp/qqbot"
 GIT_VERSION="2.53.0"
 
 echo "=========================================="
@@ -16,6 +17,7 @@ echo ""
 # 创建目录
 mkdir -p nodejs
 mkdir -p openclaw
+mkdir -p plugins
 mkdir -p git
 
 # 检测当前平台
@@ -123,6 +125,36 @@ fi
 cd ..
 echo ""
 
+# 下载 QQ 插件安装包（离线）
+echo "📦 下载 QQ 插件（离线安装包）..."
+cd plugins
+
+if command -v npm &> /dev/null; then
+  export NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}"
+
+  QQBOT_LATEST=$(npm view "${QQBOT_PACKAGE}@latest" version 2>/dev/null || echo "unknown")
+  echo "  目标版本: ${QQBOT_PACKAGE}@latest (当前最新: ${QQBOT_LATEST})"
+  echo "  使用 npm pack 打包..."
+  rm -f *.tgz
+
+  npm pack "${QQBOT_PACKAGE}@latest" --prefer-online
+
+  # npm pack @sliverp/qqbot 生成 sliverp-qqbot-<version>.tgz，重命名为统一文件名
+  for file in sliverp-qqbot-*.tgz; do
+    if [ -f "$file" ]; then
+      mv "$file" qqbot.tgz
+      echo "  ✓ 已保存为: qqbot.tgz (@sliverp/qqbot@${QQBOT_LATEST})"
+      break
+    fi
+  done
+else
+  echo "  ⚠️  npm 未安装，跳过 QQ 插件下载"
+  echo "  请手动运行: npm pack ${QQBOT_PACKAGE}@latest"
+fi
+
+cd ..
+echo ""
+
 # 显示下载的文件
 echo "=========================================="
 echo "  已下载的资源："
@@ -133,6 +165,9 @@ ls -lh nodejs/ 2>/dev/null || echo "  (无)"
 echo ""
 echo "OpenClaw:"
 ls -lh openclaw/ 2>/dev/null || echo "  (无)"
+echo ""
+echo "QQ 插件:"
+ls -lh plugins/ 2>/dev/null || echo "  (无)"
 echo ""
 echo "Git (Windows):"
 ls -lh git/ 2>/dev/null || echo "  (无)"
@@ -150,4 +185,5 @@ echo "📦 打包体积影响："
 echo "  - Node.js (每个平台): ~40-50MB"
 echo "  - Git portable (Windows): ~45-65MB"
 echo "  - OpenClaw .tgz: ~10-20MB"
-echo "  - 总计（含离线 Git）: ~90-125MB"
+echo "  - QQ 插件 .tgz: <1MB"
+echo "  - 总计（含离线 Git）: ~90-126MB"
