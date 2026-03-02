@@ -253,6 +253,47 @@ fn get_preferred_node_path() -> Option<String> {
     }
 }
 
+#[cfg(not(windows))]
+fn get_preferred_unix_npm_path() -> Option<String> {
+    if let Some(node_path) = get_preferred_node_path() {
+        let node_path = PathBuf::from(node_path);
+        if let Some(node_dir) = node_path.parent() {
+            let npm_in_same_dir = node_dir.join("npm");
+            if npm_in_same_dir.exists() {
+                return Some(npm_in_same_dir.display().to_string());
+            }
+        }
+    }
+
+    if let Some(home) = dirs::home_dir() {
+        let runtime = home.join(".openclaw-manager").join("runtime").join("node");
+        let runtime_candidates = vec![runtime.join("bin").join("npm"), runtime.join("npm")];
+        for candidate in runtime_candidates {
+            if candidate.exists() {
+                return Some(candidate.display().to_string());
+            }
+        }
+    }
+
+    if let Ok(path) = shell::run_bash_output(
+        "source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null; command -v npm 2>/dev/null",
+    ) {
+        let path = path.trim();
+        if !path.is_empty() {
+            return Some(path.to_string());
+        }
+    }
+
+    if let Ok(path) = shell::run_command_output("which", &["npm"]) {
+        let path = path.trim();
+        if !path.is_empty() {
+            return Some(path.to_string());
+        }
+    }
+
+    None
+}
+
 /// 获取 Git 版本
 fn get_git_version() -> Option<String> {
     if platform::is_windows() {
@@ -1160,60 +1201,59 @@ async fn install_openclaw_windows(_app: &tauri::AppHandle) -> Result<InstallResu
 
 /// Unix 系统安装 OpenClaw
 async fn install_openclaw_unix(app: &tauri::AppHandle) -> Result<InstallResult, String> {
-    // 检查是否有打包的离线包
-    let bundled_package = get_bundled_openclaw_package_with_app(app);
-    
-    let script = if let Some(package_path) = bundled_package {
-        info!("[安装OpenClaw] 使用离线包: {}", package_path);
-        format!(
-            r#"
-# 检查 Node.js
-if ! command -v node &> /dev/null; then
-    echo "错误：请先安装 Node.js"
-    exit 1
-fi
-
-echo "使用离线包安装 OpenClaw（无需 Git，更快更可靠）..."
-echo "包路径: {}"
-npm install -g "{}"
-
-# 刷新命令缓存
-hash -r 2>/dev/null || true
-export PATH="$PATH:$(npm prefix -g)/bin"
-
-# 验证安装
-openclaw --version
-"#,
-            package_path, package_path
-        )
-    } else {
-        info!("[安装OpenClaw] 使用在线安装");
-        r#"
-# 检查 Node.js
-if ! command -v node &> /dev/null; then
-    echo "错误：请先安装 Node.js"
-    exit 1
-fi
-
-echo "使用 npm 在线安装 OpenClaw..."
-npm install -g openclaw@latest --unsafe-perm
-
-# 刷新命令缓存
-hash -r 2>/dev/null || true
-export PATH="$PATH:$(npm prefix -g)/bin"
-
-# 验证安装
-openclaw --version
-"#
-        .to_string()
+    let Some(node_path) = get_preferred_node_path() else {
+        return Ok(InstallResult {
+            success: false,
+            message: "OpenClaw 安装失败".to_string(),
+            error: Some("未找到 Node.js，请先安装 Node.js 22+".to_string()),
+        });
+    };
+    let Some(npm_path) = get_preferred_unix_npm_path() else {
+        return Ok(InstallResult {
+            success: false,
+            message: "OpenClaw 安装失败".to_string(),
+            error: Some("未找到 npm，请确认 Node.js 安装完整".to_string()),
+        });
     };
 
-    match shell::run_bash_output(&script) {
-        Ok(output) => Ok(InstallResult {
+    info!(
+        "[安装OpenClaw] Unix/macOS 使用 Node/npm: node={}, npm={}",
+        node_path, npm_path
+    );
+
+    // 检查是否有打包的离线包
+    let bundled_package = get_bundled_openclaw_package_with_app(app);
+
+    let mut install_args = vec![
+        "install".to_string(),
+        "-g".to_string(),
+        "--unsafe-perm".to_string(),
+        "--no-audit".to_string(),
+        "--fund=false".to_string(),
+        "--loglevel=error".to_string(),
+    ];
+
+    if let Some(package_path) = bundled_package {
+        info!("[安装OpenClaw] 使用离线包: {}", package_path);
+        install_args.push(package_path);
+    } else {
+        info!("[安装OpenClaw] 使用在线安装");
+        install_args.push("openclaw@latest".to_string());
+    }
+
+    let install_args_ref: Vec<&str> = install_args.iter().map(String::as_str).collect();
+    match shell::run_command_output(&npm_path, &install_args_ref) {
+        Ok(output) => {
+            let version = get_openclaw_version().unwrap_or_else(|| "最新版本".to_string());
+            Ok(InstallResult {
             success: true,
-            message: format!("OpenClaw 安装成功！{}", output),
+            message: format!(
+                "OpenClaw 安装成功！版本: {}（node: {}, npm: {}）\n{}",
+                version, node_path, npm_path, output
+            ),
             error: None,
-        }),
+            })
+        }
         Err(e) => Ok(InstallResult {
             success: false,
             message: "OpenClaw 安装失败".to_string(),
@@ -1971,17 +2011,43 @@ Read-Host "按回车键关闭此窗口"
     } else if platform::is_macos() {
         let script_content = r#"#!/bin/bash
 clear
+RUNTIME="${HOME}/.openclaw-manager/runtime"
+prepend_path_if_dir() {
+  [ -d "$1" ] && PATH="$1:$PATH"
+}
+apply_runtime_priority_path() {
+  prepend_path_if_dir "$RUNTIME/node/bin"
+  prepend_path_if_dir "$RUNTIME/node"
+  prepend_path_if_dir "$RUNTIME/npm-global/bin"
+  prepend_path_if_dir "$RUNTIME/npm-global"
+}
+apply_runtime_priority_path
+[ -f "$HOME/.zshrc" ] && source "$HOME/.zshrc" >/dev/null 2>&1 || true
+[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" >/dev/null 2>&1 || true
+apply_runtime_priority_path
+export PATH
 echo "========================================"
 echo "    OpenClaw 安装向导"
 echo "========================================"
 echo ""
 
+NPM_CMD="$(command -v npm 2>/dev/null || true)"
+NODE_CMD="$(command -v node 2>/dev/null || true)"
+if [ -z "$NPM_CMD" ] || [ -z "$NODE_CMD" ]; then
+  echo "错误：未找到 Node.js/npm，请先安装 Node.js 22+"
+  read -p "按回车键关闭此窗口..."
+  exit 1
+fi
+
+echo "使用 Node: $NODE_CMD"
+echo "使用 npm:  $NPM_CMD"
 echo "正在安装 OpenClaw（官方版）..."
-npm install -g openclaw@latest
+"$NPM_CMD" install -g openclaw@latest --unsafe-perm --no-audit --fund=false --loglevel=error
 
 # 刷新命令缓存，确保能找到新安装的 openclaw 命令
 hash -r 2>/dev/null || true
-export PATH="$PATH:$(npm prefix -g)/bin"
+NPM_BIN_DIR="$("$NPM_CMD" prefix -g 2>/dev/null)/bin"
+[ -d "$NPM_BIN_DIR" ] && export PATH="$NPM_BIN_DIR:$PATH"
 
 echo ""
 echo "初始化配置..."
@@ -2382,7 +2448,14 @@ fn get_latest_openclaw_version() -> Option<String> {
             &["view", "openclaw", "version", "--loglevel=error"],
         )
     } else {
-        shell::run_bash_output("npm view openclaw version 2>/dev/null")
+        let Some(unix_npm) = get_preferred_unix_npm_path() else {
+            warn!("[版本检查] Unix/macOS 未找到可用 npm，跳过最新版本检查");
+            return None;
+        };
+        shell::run_command_output(
+            &unix_npm,
+            &["view", "openclaw", "version", "--loglevel=error"],
+        )
     };
 
     match result {
@@ -2594,20 +2667,49 @@ async fn update_openclaw_windows() -> Result<InstallResult, String> {
 
 /// Unix 系统更新 OpenClaw
 async fn update_openclaw_unix() -> Result<InstallResult, String> {
-    let script = r#"
-echo "更新 OpenClaw..."
-npm install -g openclaw@latest
+    let Some(node_path) = get_preferred_node_path() else {
+        return Ok(InstallResult {
+            success: false,
+            message: "OpenClaw 更新失败".to_string(),
+            error: Some("未找到 Node.js，请先安装 Node.js 22+".to_string()),
+        });
+    };
+    let Some(npm_path) = get_preferred_unix_npm_path() else {
+        return Ok(InstallResult {
+            success: false,
+            message: "OpenClaw 更新失败".to_string(),
+            error: Some("未找到 npm，请确认 Node.js 安装完整".to_string()),
+        });
+    };
 
-# 验证更新
-openclaw --version
-"#;
+    info!(
+        "[更新OpenClaw] Unix/macOS 使用 Node/npm: node={}, npm={}",
+        node_path, npm_path
+    );
 
-    match shell::run_bash_output(script) {
-        Ok(output) => Ok(InstallResult {
+    match shell::run_command_output(
+        &npm_path,
+        &[
+            "install",
+            "-g",
+            "openclaw@latest",
+            "--unsafe-perm",
+            "--no-audit",
+            "--fund=false",
+            "--loglevel=error",
+        ],
+    ) {
+        Ok(output) => {
+            let version = get_openclaw_version().unwrap_or_else(|| "最新版本".to_string());
+            Ok(InstallResult {
             success: true,
-            message: format!("OpenClaw 已更新！{}", output),
+            message: format!(
+                "OpenClaw 已更新到 {}（node: {}, npm: {}）\n{}",
+                version, node_path, npm_path, output
+            ),
             error: None,
-        }),
+            })
+        }
         Err(e) => Ok(InstallResult {
             success: false,
             message: "OpenClaw 更新失败".to_string(),
