@@ -4,21 +4,13 @@
 
 > **✨ 本项目使用官方 [OpenClaw](https://www.npmjs.com/package/openclaw)（openclaw@latest）。**
 
-> **🎁 v0.0.12+ 为完全离线版：内置 Node.js + OpenClaw，开箱即用，无需任何配置！** [查看详情](OFFLINE.md)
-
-![Platform](https://img.shields.io/badge/platform-macOS%20|%20Windows%20|%20Linux-blue)
-![Tauri](https://img.shields.io/badge/Tauri-2.0-orange)
-![React](https://img.shields.io/badge/React-18-61DAFB)
-![Rust](https://img.shields.io/badge/Rust-1.70+-red)
-![Offline](https://img.shields.io/badge/mode-完全离线-green)
-
 ## 📸 界面预览
 
 ### 📊 仪表盘概览
 
 实时监控服务状态，一键管理 AI 助手服务。
 
-![仪表盘](pic/dashboard.png)
+![仪表盘](pic/dashboard2.png)
 
 - 服务状态实时监控（端口、进程 ID、内存、运行时间）
 - 快捷操作：启动 / 停止 / 重启 / 诊断
