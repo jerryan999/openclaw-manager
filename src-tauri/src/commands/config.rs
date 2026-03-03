@@ -1,6 +1,6 @@
 use crate::models::{
     AIConfigOverview, ChannelConfig, ConfiguredModel, ConfiguredProvider, ModelConfig,
-    ModelCostConfig, OfficialProvider, OpenClawConfig, ProviderConfig, SuggestedModel,
+    OfficialProvider, SuggestedModel,
 };
 use crate::utils::{bundled, file, platform, shell};
 use log::{debug, error, info, warn};
