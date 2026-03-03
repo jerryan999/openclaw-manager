@@ -111,6 +111,24 @@ pub fn get_extended_path() -> String {
 
     #[cfg(not(windows))]
     {
+        if let Some(home) = dirs::home_dir() {
+            let runtime = home.join(".openclaw-manager").join("runtime");
+            let runtime_paths = vec![
+                runtime.join("node").join("bin"),
+                runtime.join("node"),
+                runtime.join("npm-global").join("bin"),
+                runtime.join("npm-global"),
+                runtime.join("git").join("bin"),
+                runtime.join("git").join("cmd"),
+                runtime.join("git").join("mingw64").join("bin"),
+            ];
+            for path in runtime_paths {
+                if path.exists() {
+                    paths.push(path.display().to_string());
+                }
+            }
+        }
+
         // 添加常见的可执行文件路径
         paths.push("/opt/homebrew/bin".to_string()); // Homebrew on Apple Silicon
         paths.push("/usr/local/bin".to_string()); // Homebrew on Intel / 常规安装
@@ -967,7 +985,16 @@ pub fn get_openclaw_path() -> Option<String> {
             }
         }
     } else {
-        // Unix: 检查常见的 npm 全局安装路径
+        // Unix: 优先使用当前 npm 全局目录，与升级时 `npm install -g openclaw@latest` 位置一致
+        #[cfg(not(windows))]
+        if let Some(path) = get_npm_global_openclaw_path() {
+            if std::path::Path::new(&path).exists() {
+                log_openclaw_path_once(&path, false);
+                return Some(path);
+            }
+        }
+
+        // 回退：常见路径列表
         let possible_paths = get_unix_openclaw_paths();
         for path in possible_paths {
             if std::path::Path::new(&path).exists() {
@@ -992,6 +1019,19 @@ pub fn get_openclaw_path() -> Option<String> {
     }
 
     None
+}
+
+/// 获取当前 npm 全局 bin 目录下的 openclaw 路径（仅 Unix）
+/// 与升级时 `npm install -g openclaw@latest` 的安装位置一致，保证检查与升级同一位置
+#[cfg(not(windows))]
+fn get_npm_global_openclaw_path() -> Option<String> {
+    let bin_dir = run_bash_output("npm bin -g 2>/dev/null").ok()?;
+    let bin_dir = bin_dir.trim();
+    if bin_dir.is_empty() {
+        return None;
+    }
+    let path = format!("{}/openclaw", bin_dir);
+    Some(path)
 }
 
 /// 获取 Unix 系统上可能的 openclaw 安装路径

@@ -2,7 +2,7 @@
 # Build fully offline Tauri application
 # Supports: macOS & Windows
 
-.PHONY: help build dev clean check resources install test release xattr
+.PHONY: help build dev clean check resources install test release xattr version
 
 .DEFAULT_GOAL := help
 
@@ -48,6 +48,7 @@ help: ## Show help
 	@echo "  dev         Run in development mode (uses src-tauri/resources if present = offline behavior)"
 	@echo "  build       Build offline version (release bundle)"
 	@echo "  release     Build and prepare release"
+	@echo "  version     Bump project version (make version VERSION=x.y.z)"
 ifeq ($(DETECTED_OS),macOS)
 	@echo "  xattr       Remove quarantine so app can open without 'damaged' prompt"
 endif
@@ -198,7 +199,7 @@ endif
 info: ## Show project info
 	@echo ""
 	@echo "Project: OpenClaw Manager"
-	@echo "Version: 0.0.38"
+	@echo "Version: 0.0.40"
 	@echo "Platform: $(DETECTED_OS)"
 	@echo ""
 	@echo "Resource Status:"
@@ -266,6 +267,14 @@ endif
 	@echo "  2. Create GitHub Release"
 	@echo "  3. Upload the installer"
 	@echo "  4. Write release notes"
+
+version: ## Bump project version (usage: make version VERSION=0.0.40)
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Usage: make version VERSION=x.y.z"; \
+		echo "Example: make version VERSION=0.0.40"; \
+		exit 1; \
+	fi
+	@node scripts/bump-version.cjs $(VERSION)
 	@echo ""
 
 quickstart: install resources build ## Quick start: install + resources + build

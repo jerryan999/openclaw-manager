@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 一键更新项目版本号（package.json、Cargo.toml、tauri.conf.json、Makefile）
+ * 一键更新项目版本号（package.json、package-lock.json、Cargo.toml、tauri.conf.json、Makefile）
  * 用法: node scripts/bump-version.cjs <版本号>
  * 或:   npm run version 0.0.26
  */
@@ -20,6 +20,16 @@ const files = [
   {
     path: path.join(root, 'package.json'),
     replace: (content) => content.replace(/"version":\s*"[^"]+"/, `"version": "${version}"`),
+  },
+  {
+    path: path.join(root, 'package-lock.json'),
+    replace: (content) =>
+      content
+        .replace(/"version":\s*"[^"]+"/, `"version": "${version}"`)
+        .replace(
+          /("packages"\s*:\s*\{\s*""\s*:\s*\{[\s\S]*?"version":\s*")([^"]+)(")/,
+          `$1${version}$3`,
+        ),
   },
   {
     path: path.join(root, 'src-tauri', 'Cargo.toml'),
