@@ -253,6 +253,11 @@ fn get_preferred_node_path() -> Option<String> {
     }
 }
 
+#[cfg(windows)]
+fn get_preferred_unix_npm_path() -> Option<String> {
+    None
+}
+
 #[cfg(not(windows))]
 fn get_preferred_unix_npm_path() -> Option<String> {
     if let Some(node_path) = get_preferred_node_path() {

@@ -1,6 +1,6 @@
 use crate::models::{AITestResult, ChannelTestResult, DiagnosticResult, SystemInfo};
 use crate::utils::{file, platform, shell};
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use std::path::PathBuf;
 use tauri::command;
 
@@ -873,10 +873,9 @@ read -p "按回车键关闭..."
             }
 
             #[cfg(target_os = "windows")]
-            {
-                return Err("Windows 暂不支持自动启动终端，请手动运行: openclaw channels login --channel whatsapp".to_string());
-            }
+            return Err("Windows 暂不支持自动启动终端，请手动运行: openclaw channels login --channel whatsapp".to_string());
 
+            #[cfg(not(target_os = "windows"))]
             Ok("已在新终端窗口中启动 WhatsApp 登录，请查看弹出的终端窗口并扫描二维码".to_string())
         }
         _ => Err(format!("不支持 {} 的登录向导", channel_type)),
