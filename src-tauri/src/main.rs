@@ -60,6 +60,9 @@ fn main() {
             // 飞书插件管理
             config::check_feishu_plugin,
             config::install_feishu_plugin,
+            // WeCom 插件管理
+            config::check_wecom_plugin,
+            config::install_wecom_plugin,
             // QQ 插件管理
             config::check_qq_plugin,
             config::install_qq_plugin,
