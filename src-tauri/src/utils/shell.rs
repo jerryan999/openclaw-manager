@@ -1455,9 +1455,9 @@ pub fn spawn_openclaw_gateway() -> io::Result<()> {
         cmd.env(key, value);
     }
 
-    // 设置 PATH 和 gateway token
+    // 设置 PATH（不设置 OPENCLAW_GATEWAY_TOKEN，避免 gateway 强制开启 token 认证，
+    // 否则插件访问 /json/version 等端点会返回 401）
     cmd.env("PATH", &extended_path);
-    cmd.env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN);
 
     // Windows: 隐藏控制台窗口
     #[cfg(windows)]
