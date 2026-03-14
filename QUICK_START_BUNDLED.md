@@ -89,7 +89,7 @@ curl -I https://nodejs.org/dist/
 
 # 手动下载并放到对应目录
 cd src-tauri/resources/nodejs
-curl -L -O https://nodejs.org/dist/v22.16.0/node-v22.16.0-darwin-arm64.tar.gz
+curl -L -O https://nodejs.org/dist/v24.14.0/node-v24.14.0-darwin-arm64.tar.gz
 ```
 
 ### 构建失败

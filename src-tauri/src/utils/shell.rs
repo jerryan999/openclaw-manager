@@ -49,10 +49,10 @@ static WINDOWS_GIT_EXTRACT_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 #[cfg(windows)]
 static WINDOWS_RUNTIME_PREP_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
-pub const MIN_NODE_MAJOR: u32 = 22;
-pub const MIN_NODE_MINOR: u32 = 16;
+pub const MIN_NODE_MAJOR: u32 = 24;
+pub const MIN_NODE_MINOR: u32 = 14;
 pub const MIN_NODE_PATCH: u32 = 0;
-pub const MIN_NODE_VERSION_DISPLAY: &str = "22.16.0";
+pub const MIN_NODE_VERSION_DISPLAY: &str = "24.14.0";
 
 fn parse_node_version(version: &str) -> Option<(u32, u32, u32)> {
     let trimmed = version.trim();
@@ -218,7 +218,7 @@ pub fn get_extended_path() -> String {
                 }
             }
             // 也添加常见 nvm 版本路径
-            for version in ["v23.0.0", "v22.22.0", "v22.16.0"] {
+            for version in ["v25.0.0", "v24.22.0", "v24.14.0"] {
                 let nvm_bin = format!("{}/.nvm/versions/node/{}/bin", home_str, version);
                 if std::path::Path::new(&nvm_bin).exists() {
                     paths.insert(0, nvm_bin);
@@ -1119,7 +1119,7 @@ fn get_unix_openclaw_paths() -> Vec<String> {
 
         // nvm 安装的 npm 全局包（需要找到正确的 node 版本目录）
         // 先检查常见版本
-        for version in ["v23.0.0", "v22.22.0", "v22.16.0"] {
+        for version in ["v25.0.0", "v24.22.0", "v24.14.0"] {
             paths.push(format!(
                 "{}/.nvm/versions/node/{}/bin/openclaw",
                 home_str, version

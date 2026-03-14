@@ -20,26 +20,26 @@
 
 ### 1. 下载 Node.js 预编译文件
 
-为需要支持的平台下载 Node.js v22：
+为需要支持的平台下载 Node.js v24.14.0：
 
 ```bash
 cd src-tauri/resources/nodejs
 
 # macOS ARM64 (Apple Silicon)
 curl -L -o node-macos-arm64.tar.gz \
-  https://nodejs.org/dist/v22.16.0/node-v22.16.0-darwin-arm64.tar.gz
+  https://nodejs.org/dist/v24.14.0/node-v24.14.0-darwin-arm64.tar.gz
 
 # macOS x64 (Intel)
 curl -L -o node-macos-x64.tar.gz \
-  https://nodejs.org/dist/v22.16.0/node-v22.16.0-darwin-x64.tar.gz
+  https://nodejs.org/dist/v24.14.0/node-v24.14.0-darwin-x64.tar.gz
 
 # Windows x64
 curl -L -o node-windows-x64.zip \
-  https://nodejs.org/dist/v22.16.0/node-v22.16.0-win-x64.zip
+  https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-x64.zip
 
 # Linux x64
 curl -L -o node-linux-x64.tar.gz \
-  https://nodejs.org/dist/v22.16.0/node-v22.16.0-linux-x64.tar.gz
+  https://nodejs.org/dist/v24.14.0/node-v24.14.0-linux-x64.tar.gz
 ```
 
 ### 2. 打包 OpenClaw npm 包
@@ -113,7 +113,7 @@ src-tauri/
 ### 更新 Node.js
 
 1. 访问 https://nodejs.org/dist/
-2. 选择新版本（如 v22.13.0）
+2. 选择新版本（如 v24.14.0）
 3. 重新下载对应平台的文件
 4. 替换 `src-tauri/resources/nodejs/` 中的文件
 

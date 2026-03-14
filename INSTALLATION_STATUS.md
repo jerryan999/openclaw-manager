@@ -19,7 +19,7 @@
 - ✅ 文件位置: `src-tauri/resources/`
 
 ### 3. 开发工具安装 (100%)
-- ✅ Node.js v22.15.1
+- ✅ Node.js v24.14.0
 - ✅ npm v10.9.2
 - ✅ Rust 1.93.1  
 - ✅ Cargo 1.93.1
@@ -236,7 +236,7 @@ $env:Path = "$env:USERPROFILE\.cargo\bin;" + $env:Path
 - **大小**: ~71 MB
 - **内容**:
   - 应用程序本体 (~20 MB)
-  - Node.js v22.16.0 (~33 MB)
+  - Node.js v24.14.0 (~33 MB)
   - OpenClaw 离线包 (~17 MB)
 
 ### 用户体验

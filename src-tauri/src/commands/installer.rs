@@ -21,7 +21,7 @@ pub struct EnvironmentStatus {
     pub node_installed: bool,
     /// Node.js 版本
     pub node_version: Option<String>,
-    /// Node.js 版本是否满足要求 (>=22.16.0)
+    /// Node.js 版本是否满足要求 (>=24.14.0)
     pub node_version_ok: bool,
     /// 是否有打包的 Node.js
     pub has_bundled_nodejs: bool,
@@ -470,9 +470,9 @@ fn get_unix_node_paths() -> Vec<String> {
         let home_str = home.display().to_string();
 
         // nvm 默认版本
-        paths.push(format!("{}/.nvm/versions/node/v22.16.0/bin/node", home_str));
-        paths.push(format!("{}/.nvm/versions/node/v22.22.0/bin/node", home_str));
-        paths.push(format!("{}/.nvm/versions/node/v23.0.0/bin/node", home_str));
+        paths.push(format!("{}/.nvm/versions/node/v24.14.0/bin/node", home_str));
+        paths.push(format!("{}/.nvm/versions/node/v24.22.0/bin/node", home_str));
+        paths.push(format!("{}/.nvm/versions/node/v25.0.0/bin/node", home_str));
 
         // 尝试 nvm alias default（读取 nvm 的 default alias）
         let nvm_default = format!("{}/.nvm/alias/default", home_str);
@@ -775,7 +775,7 @@ fn get_preferred_windows_npm_path() -> Option<String> {
     get_command_path("npm")
 }
 
-/// 检查 Node.js 版本是否 >= 22.16.0
+/// 检查 Node.js 版本是否 >= 24.14.0
 fn check_node_version_requirement(version: &Option<String>) -> bool {
     version
         .as_deref()
@@ -897,9 +897,9 @@ if ! command -v brew &> /dev/null; then
     fi
 fi
 
-echo "安装 Node.js 22 LTS (>=22.16)..."
-brew install node@22
-brew link --overwrite node@22
+echo "安装 Node.js 24.14.0+..."
+brew install node@24
+brew link --overwrite node@24
 
 # 验证安装
 node --version
@@ -926,15 +926,15 @@ async fn install_nodejs_linux() -> Result<InstallResult, String> {
 # 检测包管理器
 if command -v apt-get &> /dev/null; then
     echo "检测到 apt，使用 NodeSource 仓库..."
-    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+    curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
     sudo apt-get install -y nodejs
 elif command -v dnf &> /dev/null; then
     echo "检测到 dnf，使用 NodeSource 仓库..."
-    curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+    curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
     sudo dnf install -y nodejs
 elif command -v yum &> /dev/null; then
     echo "检测到 yum，使用 NodeSource 仓库..."
-    curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+    curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
     sudo yum install -y nodejs
 elif command -v pacman &> /dev/null; then
     echo "检测到 pacman..."
@@ -1858,7 +1858,7 @@ Write-Host ""
 # 检查 winget
 $hasWinget = Get-Command winget -ErrorAction SilentlyContinue
 if ($hasWinget) {
-    Write-Host "正在使用 winget 安装 Node.js 22 LTS (>=22.16)..." -ForegroundColor Yellow
+    Write-Host "正在使用 winget 安装 Node.js 24.14.0+..." -ForegroundColor Yellow
     winget install --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
 } else {
     Write-Host "请从以下地址下载安装 Node.js:" -ForegroundColor Yellow
@@ -1896,9 +1896,9 @@ if ! command -v brew &> /dev/null; then
     fi
 fi
 
-echo "正在安装 Node.js 22 LTS (>=22.16)..."
-brew install node@22
-brew link --overwrite node@22
+echo "正在安装 Node.js 24.14.0+..."
+brew install node@24
+brew link --overwrite node@24
 
 echo ""
 echo "安装完成！"
@@ -2111,7 +2111,7 @@ echo ""
 NPM_CMD="$(command -v npm 2>/dev/null || true)"
 NODE_CMD="$(command -v node 2>/dev/null || true)"
 if [ -z "$NPM_CMD" ] || [ -z "$NODE_CMD" ]; then
-  echo "错误：未找到 Node.js/npm，请先安装 Node.js 22.16+"
+  echo "错误：未找到 Node.js/npm，请先安装 Node.js 24.14.0+"
   read -p "按回车键关闭此窗口..."
   exit 1
 fi

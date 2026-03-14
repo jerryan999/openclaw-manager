@@ -245,7 +245,7 @@ export function Setup({ onComplete, embedded = false }: SetupProps) {
                   </p>
                   <p className="text-sm text-dark-400">
                     {envStatus.node_version 
-                      ? `${envStatus.node_version} ${envStatus.node_version_ok ? '✓' : '(需要 v22.16+)'}` 
+                      ? `${envStatus.node_version} ${envStatus.node_version_ok ? '✓' : '(需要 v24.14.0+)'}` 
                       : envStatus.has_bundled_nodejs
                         ? '✨ 已内置 Node.js（离线可用）'
                         : '未安装'}

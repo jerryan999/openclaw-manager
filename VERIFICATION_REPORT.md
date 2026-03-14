@@ -26,7 +26,7 @@
 ```
 node-windows-x64.zip - 33.26 MB
 ```
-- **来源**: https://nodejs.org/dist/v22.16.0/
+- **来源**: https://nodejs.org/dist/v24.14.0/
 - **用途**: Windows x64 平台的 Node.js 运行时
 - **状态**: ✅ 已下载
 
@@ -140,7 +140,7 @@ npm run tauri:build
 
 - **Windows**: `src-tauri/target/release/bundle/msi/*.msi` (~71 MB)
 - **内置内容**:
-  - Node.js v22.16.0 (Windows x64)
+  - Node.js v24.14.0 (Windows x64)
   - OpenClaw 2026.2.15-zh.2
   - 应用程序本体
 
@@ -202,20 +202,20 @@ npm run tauri:build
 **macOS ARM64**:
 ```bash
 cd src-tauri/resources/nodejs
-curl -L -O https://nodejs.org/dist/v22.16.0/node-v22.16.0-darwin-arm64.tar.gz
-mv node-v22.16.0-darwin-arm64.tar.gz node-macos-arm64.tar.gz
+curl -L -O https://nodejs.org/dist/v24.14.0/node-v24.14.0-darwin-arm64.tar.gz
+mv node-v24.14.0-darwin-arm64.tar.gz node-macos-arm64.tar.gz
 ```
 
 **macOS x64**:
 ```bash
-curl -L -O https://nodejs.org/dist/v22.16.0/node-v22.16.0-darwin-x64.tar.gz
-mv node-v22.16.0-darwin-x64.tar.gz node-macos-x64.tar.gz
+curl -L -O https://nodejs.org/dist/v24.14.0/node-v24.14.0-darwin-x64.tar.gz
+mv node-v24.14.0-darwin-x64.tar.gz node-macos-x64.tar.gz
 ```
 
 **Linux x64**:
 ```bash
-curl -L -O https://nodejs.org/dist/v22.16.0/node-v22.16.0-linux-x64.tar.gz
-mv node-v22.16.0-linux-x64.tar.gz node-linux-x64.tar.gz
+curl -L -O https://nodejs.org/dist/v24.14.0/node-v24.14.0-linux-x64.tar.gz
+mv node-v24.14.0-linux-x64.tar.gz node-linux-x64.tar.gz
 ```
 
 ### CI/CD 集成
