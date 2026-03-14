@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$NODE_VERSION = "22.12.0"
+$NODE_VERSION = "22.16.0"
 $OPENCLAW_PACKAGE = "openclaw"
 $QQBOT_PACKAGE = "@sliverp/qqbot"
 

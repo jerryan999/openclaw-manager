@@ -27,19 +27,19 @@ cd src-tauri/resources/nodejs
 
 # macOS ARM64 (Apple Silicon)
 curl -L -o node-macos-arm64.tar.gz \
-  https://nodejs.org/dist/v22.12.0/node-v22.12.0-darwin-arm64.tar.gz
+  https://nodejs.org/dist/v22.16.0/node-v22.16.0-darwin-arm64.tar.gz
 
 # macOS x64 (Intel)
 curl -L -o node-macos-x64.tar.gz \
-  https://nodejs.org/dist/v22.12.0/node-v22.12.0-darwin-x64.tar.gz
+  https://nodejs.org/dist/v22.16.0/node-v22.16.0-darwin-x64.tar.gz
 
 # Windows x64
 curl -L -o node-windows-x64.zip \
-  https://nodejs.org/dist/v22.12.0/node-v22.12.0-win-x64.zip
+  https://nodejs.org/dist/v22.16.0/node-v22.16.0-win-x64.zip
 
 # Linux x64
 curl -L -o node-linux-x64.tar.gz \
-  https://nodejs.org/dist/v22.12.0/node-v22.12.0-linux-x64.tar.gz
+  https://nodejs.org/dist/v22.16.0/node-v22.16.0-linux-x64.tar.gz
 ```
 
 ### 2. 打包 OpenClaw npm 包

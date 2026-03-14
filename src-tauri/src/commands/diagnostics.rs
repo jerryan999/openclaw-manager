@@ -116,15 +116,39 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
 
     // 检查 Node.js
     let node_check = shell::run_command_output("node", &["--version"]);
+    let (node_passed, node_message, node_suggestion) = match node_check {
+        Ok(version) => {
+            if shell::is_node_version_supported(&version) {
+                (true, version, None)
+            } else {
+                (
+                    false,
+                    format!(
+                        "{} (需要 >= v{})",
+                        version.trim(),
+                        shell::MIN_NODE_VERSION_DISPLAY
+                    ),
+                    Some(format!(
+                        "请升级 Node.js 到 {} 或更高版本",
+                        shell::MIN_NODE_VERSION_DISPLAY
+                    )),
+                )
+            }
+        }
+        Err(_) => (
+            false,
+            "未安装".to_string(),
+            Some(format!(
+                "请安装 Node.js {}+",
+                shell::MIN_NODE_VERSION_DISPLAY
+            )),
+        ),
+    };
     results.push(DiagnosticResult {
         name: "Node.js".to_string(),
-        passed: node_check.is_ok(),
-        message: node_check.clone().unwrap_or_else(|_| "未安装".to_string()),
-        suggestion: if node_check.is_err() {
-            Some("请安装 Node.js 22+".to_string())
-        } else {
-            None
-        },
+        passed: node_passed,
+        message: node_message,
+        suggestion: node_suggestion,
     });
 
     // 检查配置文件

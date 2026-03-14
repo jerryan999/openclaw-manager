@@ -4,7 +4,7 @@ set -e
 # 下载打包资源的脚本
 # 用于 CI/CD 或本地开发
 
-NODE_VERSION="22.12.0"
+NODE_VERSION="22.16.0"
 OPENCLAW_PACKAGE="openclaw"
 QQBOT_PACKAGE="@sliverp/qqbot"
 GIT_VERSION="2.53.0"

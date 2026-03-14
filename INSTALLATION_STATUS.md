@@ -236,7 +236,7 @@ $env:Path = "$env:USERPROFILE\.cargo\bin;" + $env:Path
 - **大小**: ~71 MB
 - **内容**:
   - 应用程序本体 (~20 MB)
-  - Node.js v22.12.0 (~33 MB)
+  - Node.js v22.16.0 (~33 MB)
   - OpenClaw 离线包 (~17 MB)
 
 ### 用户体验

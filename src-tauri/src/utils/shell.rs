@@ -49,6 +49,67 @@ static WINDOWS_GIT_EXTRACT_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 #[cfg(windows)]
 static WINDOWS_RUNTIME_PREP_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
+pub const MIN_NODE_MAJOR: u32 = 22;
+pub const MIN_NODE_MINOR: u32 = 16;
+pub const MIN_NODE_PATCH: u32 = 0;
+pub const MIN_NODE_VERSION_DISPLAY: &str = "22.16.0";
+
+fn parse_node_version(version: &str) -> Option<(u32, u32, u32)> {
+    let trimmed = version.trim();
+    let start = trimmed.find(|c: char| c.is_ascii_digit())?;
+    let version = &trimmed[start..];
+    let mut numbers = Vec::new();
+
+    for segment in version.split('.') {
+        let digits: String = segment
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
+        if digits.is_empty() {
+            break;
+        }
+        let value = digits.parse::<u32>().ok()?;
+        numbers.push(value);
+        if numbers.len() == 3 {
+            break;
+        }
+    }
+
+    if numbers.is_empty() {
+        return None;
+    }
+
+    Some((
+        *numbers.get(0).unwrap_or(&0),
+        *numbers.get(1).unwrap_or(&0),
+        *numbers.get(2).unwrap_or(&0),
+    ))
+}
+
+pub fn is_node_version_supported(version: &str) -> bool {
+    parse_node_version(version)
+        .map(|(major, minor, patch)| {
+            (major, minor, patch) >= (MIN_NODE_MAJOR, MIN_NODE_MINOR, MIN_NODE_PATCH)
+        })
+        .unwrap_or(false)
+}
+
+#[cfg(windows)]
+fn get_node_version_from_binary(path: &Path) -> Option<String> {
+    if !path.exists() {
+        return None;
+    }
+    let output = Command::new(path).arg("--version").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if version.is_empty() {
+        return None;
+    }
+    Some(version)
+}
+
 fn log_openclaw_path_once(path: &str, offline_runtime: bool) {
     let lock = OPENCLAW_PATH_LOGGED.get_or_init(|| Mutex::new(None));
     if let Ok(mut last) = lock.lock() {
@@ -75,7 +136,14 @@ pub fn get_extended_path() -> String {
         let _ = ensure_windows_git_if_bundled();
 
         if let Ok(runtime) = get_windows_offline_runtime() {
-            paths.push(runtime.node_dir.display().to_string());
+            let runtime_node = runtime.node_dir.join("node.exe");
+            if get_node_version_from_binary(&runtime_node)
+                .as_deref()
+                .map(is_node_version_supported)
+                .unwrap_or(false)
+            {
+                paths.push(runtime.node_dir.display().to_string());
+            }
             paths.push(runtime.npm_prefix.display().to_string());
             if let Some(ref git_exe) = runtime.git_exe {
                 if let Some(cmd_dir) = git_exe.parent() {
@@ -150,7 +218,7 @@ pub fn get_extended_path() -> String {
                 }
             }
             // 也添加常见 nvm 版本路径
-            for version in ["v22.22.0", "v22.12.0", "v22.11.0", "v22.0.0", "v23.0.0"] {
+            for version in ["v23.0.0", "v22.22.0", "v22.16.0"] {
                 let nvm_bin = format!("{}/.nvm/versions/node/{}/bin", home_str, version);
                 if std::path::Path::new(&nvm_bin).exists() {
                     paths.insert(0, nvm_bin);
@@ -1051,9 +1119,7 @@ fn get_unix_openclaw_paths() -> Vec<String> {
 
         // nvm 安装的 npm 全局包（需要找到正确的 node 版本目录）
         // 先检查常见版本
-        for version in [
-            "v22.0.0", "v22.1.0", "v22.2.0", "v22.11.0", "v22.12.0", "v23.0.0",
-        ] {
+        for version in ["v23.0.0", "v22.22.0", "v22.16.0"] {
             paths.push(format!(
                 "{}/.nvm/versions/node/{}/bin/openclaw",
                 home_str, version

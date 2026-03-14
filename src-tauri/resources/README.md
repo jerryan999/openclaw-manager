@@ -26,19 +26,19 @@ resources/
 ```bash
 # macOS ARM64 (Apple Silicon)
 curl -o src-tauri/resources/nodejs/node-macos-arm64.tar.gz \
-  https://nodejs.org/dist/v22.12.0/node-v22.12.0-darwin-arm64.tar.gz
+  https://nodejs.org/dist/v22.16.0/node-v22.16.0-darwin-arm64.tar.gz
 
 # macOS x64 (Intel)
 curl -o src-tauri/resources/nodejs/node-macos-x64.tar.gz \
-  https://nodejs.org/dist/v22.12.0/node-v22.12.0-darwin-x64.tar.gz
+  https://nodejs.org/dist/v22.16.0/node-v22.16.0-darwin-x64.tar.gz
 
 # Windows x64
 curl -o src-tauri/resources/nodejs/node-windows-x64.zip \
-  https://nodejs.org/dist/v22.12.0/node-v22.12.0-win-x64.zip
+  https://nodejs.org/dist/v22.16.0/node-v22.16.0-win-x64.zip
 
 # Linux x64
 curl -o src-tauri/resources/nodejs/node-linux-x64.tar.gz \
-  https://nodejs.org/dist/v22.12.0/node-v22.12.0-linux-x64.tar.gz
+  https://nodejs.org/dist/v22.16.0/node-v22.16.0-linux-x64.tar.gz
 ```
 
 ### 2. OpenClaw npm 包（离线安装，推荐）

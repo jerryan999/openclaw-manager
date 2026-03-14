@@ -88,7 +88,7 @@ make quickstart
 
 **内容**:
 - 应用程序本体
-- 内置 Node.js v22.12.0
+- 内置 Node.js v22.16.0
 - 内置 OpenClaw 离线包
 
 ### 用户安装体验

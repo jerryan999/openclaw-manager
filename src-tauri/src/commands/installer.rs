@@ -21,7 +21,7 @@ pub struct EnvironmentStatus {
     pub node_installed: bool,
     /// Node.js 版本
     pub node_version: Option<String>,
-    /// Node.js 版本是否满足要求 (>=22)
+    /// Node.js 版本是否满足要求 (>=22.16.0)
     pub node_version_ok: bool,
     /// 是否有打包的 Node.js
     pub has_bundled_nodejs: bool,
@@ -79,8 +79,26 @@ pub async fn check_environment(app: tauri::AppHandle) -> Result<EnvironmentStatu
         node_installed, node_version, node_version_ok, node_path
     );
 
-    // 检查打包的 Node.js
-    let has_bundled_nodejs = bundled::has_bundled_nodejs(&app);
+    // 检查打包的 Node.js（若 runtime 已存在 node.exe，则必须满足最低版本）
+    let has_bundled_nodejs = if bundled::has_bundled_nodejs(&app) {
+        #[cfg(windows)]
+        {
+            let runtime_node = get_windows_runtime_root_path().join("node").join("node.exe");
+            if runtime_node.exists() {
+                let runtime_node_str = runtime_node.display().to_string();
+                let runtime_version = get_node_version_from_path(Some(&runtime_node_str));
+                check_node_version_requirement(&runtime_version)
+            } else {
+                true
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            true
+        }
+    } else {
+        false
+    };
     info!("[环境检查] 打包的 Node.js: {}", if has_bundled_nodejs { "存在" } else { "不存在" });
 
     // 检查 Git
@@ -204,25 +222,46 @@ fn get_node_version_from_path(node_path: Option<&str>) -> Option<String> {
 
 fn get_preferred_node_path() -> Option<String> {
     if platform::is_windows() {
+        // 优先使用满足最低版本要求的 Node；若都不满足，回退到任意可用 Node 便于展示诊断信息
+        let mut fallback: Option<String> = None;
+
         // 仅检测 runtime 中现有的 Node，不触发离线 runtime 自动准备
         let runtime_node = get_windows_runtime_root_path().join("node").join("node.exe");
         if runtime_node.exists() {
-            return Some(runtime_node.display().to_string());
-        }
-
-        for path in get_windows_node_paths() {
-            if std::path::Path::new(&path).exists() {
+            let path = runtime_node.display().to_string();
+            if fallback.is_none() {
+                fallback = Some(path.clone());
+            }
+            if check_node_version_requirement(&get_node_version_from_path(Some(&path))) {
                 return Some(path);
             }
         }
 
-        if let Ok(output) = run_program_output("where", &["node"]) {
-            if let Some(path) = output.lines().map(str::trim).find(|line| !line.is_empty()) {
-                return Some(path.to_string());
+        for path in get_windows_node_paths() {
+            if std::path::Path::new(&path).exists() {
+                if fallback.is_none() {
+                    fallback = Some(path.clone());
+                }
+                if check_node_version_requirement(&get_node_version_from_path(Some(&path))) {
+                    return Some(path);
+                }
             }
         }
-        None
+
+        if let Ok(output) = run_program_output("where", &["node"]) {
+            for path in output.lines().map(str::trim).filter(|line| !line.is_empty()) {
+                let path = path.to_string();
+                if fallback.is_none() {
+                    fallback = Some(path.clone());
+                }
+                if check_node_version_requirement(&get_node_version_from_path(Some(&path))) {
+                    return Some(path);
+                }
+            }
+        }
+        fallback
     } else {
+        let mut fallback: Option<String> = None;
         let mut runtime_candidates: Vec<String> = Vec::new();
         if let Some(home) = dirs::home_dir() {
             let home_str = home.display().to_string();
@@ -231,13 +270,23 @@ fn get_preferred_node_path() -> Option<String> {
         }
         for path in runtime_candidates {
             if std::path::Path::new(&path).exists() {
-                return Some(path);
+                if fallback.is_none() {
+                    fallback = Some(path.clone());
+                }
+                if check_node_version_requirement(&get_node_version_from_path(Some(&path))) {
+                    return Some(path);
+                }
             }
         }
 
         for path in get_unix_node_paths() {
             if std::path::Path::new(&path).exists() {
-                return Some(path);
+                if fallback.is_none() {
+                    fallback = Some(path.clone());
+                }
+                if check_node_version_requirement(&get_node_version_from_path(Some(&path))) {
+                    return Some(path);
+                }
             }
         }
 
@@ -246,10 +295,16 @@ fn get_preferred_node_path() -> Option<String> {
         ) {
             let path = path.trim();
             if !path.is_empty() {
-                return Some(path.to_string());
+                let path = path.to_string();
+                if fallback.is_none() {
+                    fallback = Some(path.clone());
+                }
+                if check_node_version_requirement(&get_node_version_from_path(Some(&path))) {
+                    return Some(path);
+                }
             }
         }
-        None
+        fallback
     }
 }
 
@@ -415,11 +470,8 @@ fn get_unix_node_paths() -> Vec<String> {
         let home_str = home.display().to_string();
 
         // nvm 默认版本
-        paths.push(format!("{}/.nvm/versions/node/v22.0.0/bin/node", home_str));
-        paths.push(format!("{}/.nvm/versions/node/v22.1.0/bin/node", home_str));
-        paths.push(format!("{}/.nvm/versions/node/v22.2.0/bin/node", home_str));
-        paths.push(format!("{}/.nvm/versions/node/v22.11.0/bin/node", home_str));
-        paths.push(format!("{}/.nvm/versions/node/v22.12.0/bin/node", home_str));
+        paths.push(format!("{}/.nvm/versions/node/v22.16.0/bin/node", home_str));
+        paths.push(format!("{}/.nvm/versions/node/v22.22.0/bin/node", home_str));
         paths.push(format!("{}/.nvm/versions/node/v23.0.0/bin/node", home_str));
 
         // 尝试 nvm alias default（读取 nvm 的 default alias）
@@ -696,33 +748,39 @@ fn get_windows_runtime_openclaw_version(path: Option<&str>) -> Option<String> {
 fn get_windows_runtime_npm_path() -> Option<String> {
     if let Ok(runtime) = shell::get_windows_offline_runtime() {
         let npm_cmd = runtime.node_dir.join("npm.cmd");
-        if npm_cmd.exists() {
+        let node_exe = runtime.node_dir.join("node.exe");
+        let node_exe_str = node_exe.display().to_string();
+        let runtime_node_version = get_node_version_from_path(Some(&node_exe_str));
+        if npm_cmd.exists() && check_node_version_requirement(&runtime_node_version) {
             return Some(npm_cmd.display().to_string());
         }
     }
 
     let npm_cmd = get_windows_runtime_root_path().join("node").join("npm.cmd");
-    if npm_cmd.exists() {
+    let node_exe = get_windows_runtime_root_path().join("node").join("node.exe");
+    let node_exe_str = node_exe.display().to_string();
+    let runtime_node_version = get_node_version_from_path(Some(&node_exe_str));
+    if npm_cmd.exists() && check_node_version_requirement(&runtime_node_version) {
         return Some(npm_cmd.display().to_string());
     }
 
     None
 }
 
-/// 检查 Node.js 版本是否 >= 22
-fn check_node_version_requirement(version: &Option<String>) -> bool {
-    if let Some(v) = version {
-        // 解析版本号 "v22.1.0" -> 22
-        let major = v
-            .trim_start_matches('v')
-            .split('.')
-            .next()
-            .and_then(|s| s.parse::<u32>().ok())
-            .unwrap_or(0);
-        major >= 22
-    } else {
-        false
+fn get_preferred_windows_npm_path() -> Option<String> {
+    if let Some(runtime_npm) = get_windows_runtime_npm_path() {
+        return Some(runtime_npm);
     }
+
+    get_command_path("npm")
+}
+
+/// 检查 Node.js 版本是否 >= 22.16.0
+fn check_node_version_requirement(version: &Option<String>) -> bool {
+    version
+        .as_deref()
+        .map(shell::is_node_version_supported)
+        .unwrap_or(false)
 }
 
 /// 安装 Node.js
@@ -781,10 +839,21 @@ async fn install_nodejs_windows() -> Result<InstallResult, String> {
 
                 let version_cmd = format!("\"{}\" --version", node_exe.display());
                 match shell::run_cmd_output(&version_cmd) {
+                    Ok(version) if shell::is_node_version_supported(version.trim()) => {
+                        Ok(InstallResult {
+                            success: true,
+                            message: format!("Node.js 离线运行时已就绪: {}", version.trim()),
+                            error: None,
+                        })
+                    }
                     Ok(version) => Ok(InstallResult {
-                        success: true,
-                        message: format!("Node.js 离线运行时已就绪: {}", version.trim()),
-                        error: None,
+                        success: false,
+                        message: "Node.js 安装失败".to_string(),
+                        error: Some(format!(
+                            "离线 Node.js 版本过低: {}，需要 >= v{}。请升级 OpenClaw Manager 或安装系统 Node.js。",
+                            version.trim(),
+                            shell::MIN_NODE_VERSION_DISPLAY
+                        )),
                     }),
                     Err(e) => Ok(InstallResult {
                         success: false,
@@ -828,7 +897,7 @@ if ! command -v brew &> /dev/null; then
     fi
 fi
 
-echo "安装 Node.js 22..."
+echo "安装 Node.js 22 LTS (>=22.16)..."
 brew install node@22
 brew link --overwrite node@22
 
@@ -1210,7 +1279,10 @@ async fn install_openclaw_unix(app: &tauri::AppHandle) -> Result<InstallResult, 
         return Ok(InstallResult {
             success: false,
             message: "OpenClaw 安装失败".to_string(),
-            error: Some("未找到 Node.js，请先安装 Node.js 22+".to_string()),
+            error: Some(format!(
+                "未找到可用 Node.js，请先安装 Node.js {}+",
+                shell::MIN_NODE_VERSION_DISPLAY
+            )),
         });
     };
     let Some(npm_path) = get_preferred_unix_npm_path() else {
@@ -1786,7 +1858,7 @@ Write-Host ""
 # 检查 winget
 $hasWinget = Get-Command winget -ErrorAction SilentlyContinue
 if ($hasWinget) {
-    Write-Host "正在使用 winget 安装 Node.js 22..." -ForegroundColor Yellow
+    Write-Host "正在使用 winget 安装 Node.js 22 LTS (>=22.16)..." -ForegroundColor Yellow
     winget install --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
 } else {
     Write-Host "请从以下地址下载安装 Node.js:" -ForegroundColor Yellow
@@ -1824,7 +1896,7 @@ if ! command -v brew &> /dev/null; then
     fi
 fi
 
-echo "正在安装 Node.js 22..."
+echo "正在安装 Node.js 22 LTS (>=22.16)..."
 brew install node@22
 brew link --overwrite node@22
 
@@ -2039,7 +2111,7 @@ echo ""
 NPM_CMD="$(command -v npm 2>/dev/null || true)"
 NODE_CMD="$(command -v node 2>/dev/null || true)"
 if [ -z "$NPM_CMD" ] || [ -z "$NODE_CMD" ]; then
-  echo "错误：未找到 Node.js/npm，请先安装 Node.js 22+"
+  echo "错误：未找到 Node.js/npm，请先安装 Node.js 22.16+"
   read -p "按回车键关闭此窗口..."
   exit 1
 fi
@@ -2611,11 +2683,14 @@ pub async fn update_openclaw() -> Result<InstallResult, String> {
 
 /// Windows 更新 OpenClaw
 async fn update_openclaw_windows() -> Result<InstallResult, String> {
-    let Some(runtime_npm) = get_windows_runtime_npm_path() else {
+    let Some(runtime_npm) = get_preferred_windows_npm_path() else {
         return Ok(InstallResult {
             success: false,
             message: "OpenClaw 更新失败".to_string(),
-            error: Some("未找到 runtime npm，请先在应用内完成 Node 运行时安装".to_string()),
+            error: Some(format!(
+                "未找到可用 npm，请先安装 Node.js {}+",
+                shell::MIN_NODE_VERSION_DISPLAY
+            )),
         });
     };
     let runtime_prefix = get_windows_runtime_root_path().join("npm-global");
@@ -2676,7 +2751,10 @@ async fn update_openclaw_unix() -> Result<InstallResult, String> {
         return Ok(InstallResult {
             success: false,
             message: "OpenClaw 更新失败".to_string(),
-            error: Some("未找到 Node.js，请先安装 Node.js 22+".to_string()),
+            error: Some(format!(
+                "未找到可用 Node.js，请先安装 Node.js {}+",
+                shell::MIN_NODE_VERSION_DISPLAY
+            )),
         });
     };
     let Some(npm_path) = get_preferred_unix_npm_path() else {

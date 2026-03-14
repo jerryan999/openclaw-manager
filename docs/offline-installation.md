@@ -188,11 +188,11 @@ cd src-tauri/resources/nodejs
 
 # macOS ARM64
 curl -L -o node-macos-arm64.tar.gz \
-  https://nodejs.org/dist/v22.12.0/node-v22.12.0-darwin-arm64.tar.gz
+  https://nodejs.org/dist/v22.16.0/node-v22.16.0-darwin-arm64.tar.gz
 
 # Windows x64
 curl -L -o node-windows-x64.zip \
-  https://nodejs.org/dist/v22.12.0/node-v22.12.0-win-x64.zip
+  https://nodejs.org/dist/v22.16.0/node-v22.16.0-win-x64.zip
 ```
 
 ⚠️ 注意：打包 Node.js 会增加 ~50MB 体积，仅在必要时使用。

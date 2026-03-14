@@ -127,7 +127,7 @@ src-tauri/target/release/bundle/msi/
 
 ### 包含内容
 - ✅ 应用程序本体
-- ✅ Node.js v22.12.0 (内置)
+- ✅ Node.js v22.16.0 (内置)
 - ✅ OpenClaw 2026.2.15-zh.2 (内置)
 
 ### 用户体验
