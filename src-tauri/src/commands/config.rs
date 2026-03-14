@@ -1100,13 +1100,20 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
         ("feishu", "feishu", vec!["testChatId"]),
         ("whatsapp", "whatsapp", vec![]),
         ("imessage", "imessage", vec![]),
-        ("wechat", "wechat", vec![]),
+        ("wecom", "wecom", vec![]),
         ("dingtalk", "dingtalk", vec![]),
         ("qqbot", "qqbot", vec![]),
     ];
 
     for (channel_id, channel_type, test_fields) in channel_types {
-        let channel_config = channels_obj.get(channel_id);
+        // 兼容旧配置：wecom 渠道优先读 channels.wecom，缺失时回退 channels.wechat
+        let channel_config = if channel_id == "wecom" {
+            channels_obj
+                .get("wecom")
+                .or_else(|| channels_obj.get("wechat"))
+        } else {
+            channels_obj.get(channel_id)
+        };
 
         let enabled = channel_config
             .and_then(|c| c.get("enabled"))
@@ -1230,6 +1237,25 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
         "enabled": true
     });
 
+    // 渠道迁移：wecom 保存后清理旧 wechat 键
+    if channel.id == "wecom" {
+        if let Some(channels) = config.get_mut("channels").and_then(|v| v.as_object_mut()) {
+            channels.remove("wechat");
+        }
+        if let Some(allow_arr) = config
+            .pointer_mut("/plugins/allow")
+            .and_then(|v| v.as_array_mut())
+        {
+            allow_arr.retain(|v| v.as_str() != Some("wechat"));
+        }
+        if let Some(entries) = config
+            .pointer_mut("/plugins/entries")
+            .and_then(|v| v.as_object_mut())
+        {
+            entries.remove("wechat");
+        }
+    }
+
     // 保存配置
     info!("[保存渠道配置] 写入配置文件...");
     match save_openclaw_config(&config) {
@@ -1251,11 +1277,19 @@ pub async fn clear_channel_config(channel_id: String) -> Result<String, String> 
 
     let mut config = load_openclaw_config()?;
     let env_path = platform::get_env_file_path();
+    let mut channel_ids_to_remove = vec![channel_id.clone()];
+
+    // 兼容迁移：清空 wecom 时一并清除旧 wechat 键
+    if channel_id == "wecom" {
+        channel_ids_to_remove.push("wechat".to_string());
+    }
 
     // 从 channels 对象中删除该渠道
     if let Some(channels) = config.get_mut("channels").and_then(|v| v.as_object_mut()) {
-        channels.remove(&channel_id);
-        info!("[清空渠道配置] 已从 channels 中删除: {}", channel_id);
+        for id in &channel_ids_to_remove {
+            channels.remove(id);
+            info!("[清空渠道配置] 已从 channels 中删除: {}", id);
+        }
     }
 
     // 从 plugins.allow 数组中删除
@@ -1263,8 +1297,17 @@ pub async fn clear_channel_config(channel_id: String) -> Result<String, String> 
         .pointer_mut("/plugins/allow")
         .and_then(|v| v.as_array_mut())
     {
-        allow_arr.retain(|v| v.as_str() != Some(&channel_id));
-        info!("[清空渠道配置] 已从 plugins.allow 中删除: {}", channel_id);
+        allow_arr.retain(|v| {
+            if let Some(s) = v.as_str() {
+                !channel_ids_to_remove.iter().any(|id| id == s)
+            } else {
+                true
+            }
+        });
+        info!(
+            "[清空渠道配置] 已从 plugins.allow 中删除: {:?}",
+            channel_ids_to_remove
+        );
     }
 
     // 从 plugins.entries 中删除
@@ -1272,18 +1315,22 @@ pub async fn clear_channel_config(channel_id: String) -> Result<String, String> 
         .pointer_mut("/plugins/entries")
         .and_then(|v| v.as_object_mut())
     {
-        entries.remove(&channel_id);
-        info!("[清空渠道配置] 已从 plugins.entries 中删除: {}", channel_id);
+        for id in &channel_ids_to_remove {
+            entries.remove(id);
+            info!("[清空渠道配置] 已从 plugins.entries 中删除: {}", id);
+        }
     }
 
     // 清除相关的环境变量
-    let env_prefixes = vec![
-        format!("OPENCLAW_{}_USERID", channel_id.to_uppercase()),
-        format!("OPENCLAW_{}_TESTCHATID", channel_id.to_uppercase()),
-        format!("OPENCLAW_{}_TESTCHANNELID", channel_id.to_uppercase()),
-    ];
-    for env_key in env_prefixes {
-        let _ = file::remove_env_value(&env_path, &env_key);
+    for id in &channel_ids_to_remove {
+        let env_prefixes = vec![
+            format!("OPENCLAW_{}_USERID", id.to_uppercase()),
+            format!("OPENCLAW_{}_TESTCHATID", id.to_uppercase()),
+            format!("OPENCLAW_{}_TESTCHANNELID", id.to_uppercase()),
+        ];
+        for env_key in env_prefixes {
+            let _ = file::remove_env_value(&env_path, &env_key);
+        }
     }
 
     // 保存配置
@@ -1410,6 +1457,117 @@ pub async fn install_feishu_plugin() -> Result<String, String> {
             error!("[飞书插件] ✗ 安装失败: {}", e);
             Err(format!(
                 "安装飞书插件失败: {}\n\n请手动执行: openclaw plugins install @m1heng-clawd/feishu",
+                e
+            ))
+        }
+    }
+}
+
+// ============ WeCom 插件管理 ============
+
+/// WeCom 插件状态
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WeComPluginStatus {
+    pub installed: bool,
+    pub version: Option<String>,
+    pub plugin_name: Option<String>,
+}
+
+/// 检查 WeCom 插件是否已安装
+#[command]
+pub async fn check_wecom_plugin() -> Result<WeComPluginStatus, String> {
+    info!("[WeCom插件] 检查 WeCom 插件安装状态...");
+
+    match shell::run_openclaw(&["plugins", "list"]) {
+        Ok(output) => {
+            debug!("[WeCom插件] plugins list 输出: {}", output);
+
+            let lines: Vec<&str> = output.lines().collect();
+            let wecom_line = lines.iter().find(|line| {
+                let lower = line.to_lowercase();
+                lower.contains("wecom-openclaw-plugin")
+                    || lower.contains("@wecom/wecom-openclaw-plugin")
+                    || lower.contains("wecom")
+            });
+
+            if let Some(line) = wecom_line {
+                info!("[WeCom插件] ✓ WeCom 插件已安装: {}", line);
+
+                let version = if line.contains('@') {
+                    line.split('@').last().map(|s| s.trim().to_string())
+                } else {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    parts
+                        .iter()
+                        .find(|p| {
+                            p.chars()
+                                .next()
+                                .map(|c| c.is_ascii_digit())
+                                .unwrap_or(false)
+                        })
+                        .map(|s| s.to_string())
+                };
+
+                Ok(WeComPluginStatus {
+                    installed: true,
+                    version,
+                    plugin_name: Some(line.trim().to_string()),
+                })
+            } else {
+                info!("[WeCom插件] ✗ WeCom 插件未安装");
+                Ok(WeComPluginStatus {
+                    installed: false,
+                    version: None,
+                    plugin_name: None,
+                })
+            }
+        }
+        Err(e) => {
+            warn!("[WeCom插件] 检查插件列表失败: {}", e);
+            Ok(WeComPluginStatus {
+                installed: false,
+                version: None,
+                plugin_name: None,
+            })
+        }
+    }
+}
+
+/// 安装 WeCom 插件
+#[command]
+pub async fn install_wecom_plugin() -> Result<String, String> {
+    info!("[WeCom插件] 开始安装 WeCom 插件...");
+
+    let status = check_wecom_plugin().await?;
+    if status.installed {
+        info!("[WeCom插件] WeCom 插件已安装，跳过");
+        return Ok(format!(
+            "WeCom 插件已安装: {}",
+            status.plugin_name.unwrap_or_default()
+        ));
+    }
+
+    info!("[WeCom插件] 执行 openclaw plugins install @wecom/wecom-openclaw-plugin ...");
+    match shell::run_openclaw(&["plugins", "install", "@wecom/wecom-openclaw-plugin"]) {
+        Ok(output) => {
+            info!("[WeCom插件] 安装输出: {}", output);
+
+            let verify_status = check_wecom_plugin().await?;
+            if verify_status.installed {
+                info!("[WeCom插件] ✓ WeCom 插件安装成功");
+                Ok(format!(
+                    "WeCom 插件安装成功: {}",
+                    verify_status.plugin_name.unwrap_or_default()
+                ))
+            } else {
+                warn!("[WeCom插件] 安装命令执行成功但插件未找到");
+                Err("安装命令执行成功但插件未找到，请检查 openclaw 版本".to_string())
+            }
+        }
+        Err(e) => {
+            error!("[WeCom插件] ✗ 安装失败: {}", e);
+            Err(format!(
+                "安装 WeCom 插件失败: {}\n\n请手动执行: openclaw plugins install @wecom/wecom-openclaw-plugin",
                 e
             ))
         }

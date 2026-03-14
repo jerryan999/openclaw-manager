@@ -240,7 +240,7 @@ fn channel_needs_send_test(channel_type: &str) -> bool {
         // 这些渠道需要发送测试消息来验证
         "telegram" | "discord" | "slack" | "feishu" => true,
         // 只检查状态，不发送测试消息（无测试目标或需在客户端验证）
-        "whatsapp" | "imessage" | "qqbot" => false,
+        "whatsapp" | "imessage" | "qqbot" | "wecom" => false,
         _ => false,
     }
 }
@@ -282,6 +282,21 @@ fn is_plugin_channel_configured_in_config(channel_id: &str) -> Option<String> {
                 .and_then(|v| v.as_str())
                 .filter(|s| !s.is_empty());
             if app_id.is_some() && app_secret.is_some() {
+                Some("已配置（请启动 Gateway 验证）".to_string())
+            } else {
+                None
+            }
+        }
+        "wecom" => {
+            let bot_id = ch_obj
+                .get("botId")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty());
+            let secret = ch_obj
+                .get("secret")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty());
+            if bot_id.is_some() && secret.is_some() {
                 Some("已配置（请启动 Gateway 验证）".to_string())
             } else {
                 None
@@ -390,7 +405,7 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
                         }
                     }
                 }
-                // 若 status 未列出该渠道，对插件渠道（qqbot/feishu）尝试从配置文件判断是否已配置
+                // 若 status 未列出该渠道，对插件渠道（qqbot/feishu/wecom）尝试从配置文件判断是否已配置
                 if !channel_ok {
                     if let Some(msg) = is_plugin_channel_configured_in_config(&channel_lower) {
                         channel_ok = true;

@@ -38,6 +38,12 @@ interface QQPluginStatus {
   plugin_name: string | null;
 }
 
+interface WeComPluginStatus {
+  installed: boolean;
+  version: string | null;
+  plugin_name: string | null;
+}
+
 interface ChannelConfig {
   id: string;
   channel_type: string;
@@ -170,15 +176,33 @@ const channelInfo: Record<
     ],
     helpText: '需要扫描二维码登录，运行: openclaw channels login --channel whatsapp',
   },
-  wechat: {
-    name: '微信',
+  wecom: {
+    name: '企业微信',
     icon: <MessageSquare size={20} />,
     color: 'text-green-600',
     fields: [
-      { key: 'appId', label: 'App ID', type: 'text', placeholder: '微信开放平台 App ID' },
-      { key: 'appSecret', label: 'App Secret', type: 'password', placeholder: '微信开放平台 App Secret' },
+      { key: 'botId', label: 'Bot ID', type: 'text', placeholder: '企业微信 AI 机器人 Bot ID', required: true },
+      { key: 'secret', label: 'Secret', type: 'password', placeholder: '企业微信 AI 机器人 Secret', required: true },
+      { key: 'websocketUrl', label: 'WebSocket URL', type: 'text', placeholder: 'wss://openws.work.weixin.qq.com (可选)' },
+      { key: 'dmPolicy', label: '私聊策略', type: 'select', options: [
+        { value: 'open', label: '开放模式' },
+        { value: 'pairing', label: '配对模式' },
+        { value: 'allowlist', label: '白名单' },
+        { value: 'disabled', label: '禁用' },
+      ]},
+      { key: 'groupPolicy', label: '群组策略', type: 'select', options: [
+        { value: 'open', label: '开放' },
+        { value: 'allowlist', label: '白名单' },
+        { value: 'disabled', label: '禁用' },
+      ]},
+      { key: 'allowFrom', label: '私聊白名单', type: 'text', placeholder: 'user_id_1,user_id_2 (可选)' },
+      { key: 'groupAllowFrom', label: '群聊白名单', type: 'text', placeholder: 'group_id_1,group_id_2 (可选)' },
+      { key: 'sendThinkingMessage', label: '发送思考占位消息', type: 'select', options: [
+        { value: 'true', label: '是' },
+        { value: 'false', label: '否' },
+      ]},
     ],
-    helpText: '微信公众号/企业微信配置',
+    helpText: '企业微信插件：@wecom/wecom-openclaw-plugin',
   },
   dingtalk: {
     name: '钉钉',
@@ -229,6 +253,11 @@ export function Channels() {
   const [qqPluginStatus, setQQPluginStatus] = useState<QQPluginStatus | null>(null);
   const [qqPluginLoading, setQQPluginLoading] = useState(false);
   const [qqPluginInstalling, setQQPluginInstalling] = useState(false);
+
+  // WeCom 插件状态
+  const [wecomPluginStatus, setWeComPluginStatus] = useState<WeComPluginStatus | null>(null);
+  const [wecomPluginLoading, setWeComPluginLoading] = useState(false);
+  const [wecomPluginInstalling, setWeComPluginInstalling] = useState(false);
   
   // 跟踪哪些密码字段显示明文
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
@@ -300,6 +329,35 @@ export function Channels() {
       alert('安装失败: ' + e);
     } finally {
       setQQPluginInstalling(false);
+    }
+  };
+
+  // 检查 WeCom 插件状态
+  const checkWeComPlugin = async () => {
+    setWeComPluginLoading(true);
+    try {
+      const status = await invoke<WeComPluginStatus>('check_wecom_plugin');
+      setWeComPluginStatus(status);
+    } catch (e) {
+      console.error('检查 WeCom 插件失败:', e);
+      setWeComPluginStatus({ installed: false, version: null, plugin_name: null });
+    } finally {
+      setWeComPluginLoading(false);
+    }
+  };
+
+  // 安装 WeCom 插件
+  const handleInstallWeComPlugin = async () => {
+    setWeComPluginInstalling(true);
+    try {
+      const result = await invoke<string>('install_wecom_plugin');
+      alert(result);
+      // 刷新插件状态
+      await checkWeComPlugin();
+    } catch (e) {
+      alert('安装失败: ' + e);
+    } finally {
+      setWeComPluginInstalling(false);
     }
   };
   
@@ -471,6 +529,11 @@ export function Channels() {
       if (channel.channel_type === 'qqbot') {
         checkQQPlugin();
       }
+
+      // 如果选择的是 WeCom 渠道，检查插件状态
+      if (channel.channel_type === 'wecom') {
+        checkWeComPlugin();
+      }
     } else {
       setConfigForm({});
     }
@@ -487,6 +550,16 @@ export function Channels() {
       // 转换表单值
       const config: Record<string, unknown> = {};
       Object.entries(configForm).forEach(([key, value]) => {
+        if ((key === 'allowFrom' || key === 'groupAllowFrom') && value) {
+          const list = value
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+          if (list.length > 0) {
+            config[key] = list;
+          }
+          return;
+        }
         if (value === 'true') {
           config[key] = true;
         } else if (value === 'false') {
@@ -686,6 +759,66 @@ export function Channels() {
                             </div>
                             <p className="text-xs text-gray-500 mt-2">
                               或手动执行: <code className="px-1.5 py-0.5 bg-dark-600 rounded text-gray-400">openclaw plugins install @sliverp/qqbot@latest</code>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* WeCom 插件状态提示 */}
+                {currentChannel.channel_type === 'wecom' && (
+                  <div className="mb-4">
+                    {wecomPluginLoading ? (
+                      <div className="p-4 bg-dark-600 rounded-xl border border-dark-500 flex items-center gap-3">
+                        <Loader2 size={20} className="animate-spin text-gray-400" />
+                        <span className="text-gray-400">正在检查 WeCom 插件状态...</span>
+                      </div>
+                    ) : wecomPluginStatus?.installed ? (
+                      <div className="p-4 bg-green-500/10 rounded-xl border border-green-500/30 flex items-center gap-3">
+                        <Package size={20} className="text-green-400" />
+                        <div className="flex-1">
+                          <p className="text-green-400 font-medium">WeCom 插件已安装</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {wecomPluginStatus.plugin_name || '@wecom/wecom-openclaw-plugin'}
+                            {wecomPluginStatus.version && ` v${wecomPluginStatus.version}`}
+                          </p>
+                        </div>
+                        <CheckCircle size={16} className="text-green-400" />
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-amber-500/10 rounded-xl border border-amber-500/30">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle size={20} className="text-amber-400 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-amber-400 font-medium">需要安装 WeCom 插件</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              企业微信渠道需要先安装 @wecom/wecom-openclaw-plugin 插件才能使用。
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                onClick={handleInstallWeComPlugin}
+                                disabled={wecomPluginInstalling}
+                                className="btn-primary flex items-center gap-2 text-sm py-2"
+                              >
+                                {wecomPluginInstalling ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <Download size={14} />
+                                )}
+                                {wecomPluginInstalling ? '安装中...' : '一键安装插件'}
+                              </button>
+                              <button
+                                onClick={checkWeComPlugin}
+                                disabled={wecomPluginLoading}
+                                className="btn-secondary flex items-center gap-2 text-sm py-2"
+                              >
+                                刷新状态
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">
+                              或手动执行: <code className="px-1.5 py-0.5 bg-dark-600 rounded text-gray-400">openclaw plugins install @wecom/wecom-openclaw-plugin</code>
                             </p>
                           </div>
                         </div>
